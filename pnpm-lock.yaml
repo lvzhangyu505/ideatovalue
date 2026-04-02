@@ -213,9 +213,6 @@ importers:
       shadcn:
         specifier: latest
         version: 4.1.2(@cfworker/json-schema@4.1.1)(@types/node@20.19.37)(typescript@5.9.3)
-      tailwindcss:
-        specifier: ^4
-        version: 4.2.2
       tsup:
         specifier: ^8.3.5
         version: 8.5.1(jiti@2.6.1)(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.3)(yaml@1.10.3)
