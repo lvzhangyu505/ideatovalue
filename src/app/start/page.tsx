@@ -29,38 +29,69 @@ import {
   TrendingUp
 } from 'lucide-react';
 
+const initialFormData = {
+  // 第一步：基本信息
+  projectName: '',
+  projectType: '',
+  description: '',
+  
+  // 项目逻辑
+  goal: '',
+  problem: '',
+  audience: '',
+  solution: '',
+  verification: '',
+  
+  // 资源与风险
+  existingResources: '',
+  neededResources: '',
+  keyRisks: '',
+  riskResponses: '',
+  
+  // 时间安排
+  timeline: '',
+  
+  // 联系方式
+  contactName: '',
+  contactEmail: '',
+  contactPhone: '',
+};
+
+const projectTypeLabels: Record<string, string> = {
+  content: '内容型',
+  activity: '活动型',
+  product: '产品型',
+  service: '服务型',
+  experiment: '社群实验型',
+};
+
+const requiredFieldLabels: Array<[keyof typeof initialFormData, string]> = [
+  ['projectName', '项目名称'],
+  ['projectType', '项目类型'],
+  ['description', '项目简介'],
+  ['goal', '项目目标'],
+  ['problem', '要解决的问题'],
+  ['audience', '面向对象/受众'],
+  ['solution', '方案路径'],
+  ['verification', '验证标准'],
+  ['existingResources', '当前已有资源'],
+  ['neededResources', '当前仍需支持'],
+  ['keyRisks', '关键风险'],
+  ['riskResponses', '应对思路'],
+  ['timeline', '初步时间安排'],
+  ['contactName', '联系人姓名'],
+  ['contactEmail', '联系邮箱'],
+];
+
 export default function StartProjectPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 6;
 
   // 表单数据状态
-  const [formData, setFormData] = useState({
-    // 第一步：基本信息
-    projectName: '',
-    projectType: '',
-    description: '',
-    
-    // 项目逻辑
-    goal: '',
-    problem: '',
-    audience: '',
-    solution: '',
-    verification: '',
-    
-    // 资源与风险
-    existingResources: '',
-    neededResources: '',
-    keyRisks: '',
-    riskResponses: '',
-    
-    // 时间安排
-    timeline: '',
-    
-    // 联系方式
-    contactName: '',
-    contactEmail: '',
-    contactPhone: '',
-  });
+  const [formData, setFormData] = useState(initialFormData);
+  const [submitError, setSubmitError] = useState('');
+  const [submitSuccess, setSubmitSuccess] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const steps = [
     { id: 1, title: '基本信息', icon: FileText },
@@ -83,10 +114,44 @@ export default function StartProjectPage() {
     }
   };
 
-  const handleSubmit = () => {
-    // 这里会提交表单数据到后端
-    console.log('提交项目申请:', formData);
-    alert('项目申请已提交，等待审核！');
+  const handleSubmit = async () => {
+    setSubmitError('');
+    setSubmitSuccess('');
+
+    const missingFields = requiredFieldLabels
+      .filter(([field]) => !formData[field].trim())
+      .map(([, label]) => label);
+
+    if (missingFields.length > 0) {
+      setSubmitError(`还有未填写的必填项：${missingFields.join('、')}。`);
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch('/api/project-applications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const result = (await response.json()) as { message?: string };
+
+      if (!response.ok) {
+        setSubmitError(result.message || '提交失败，请稍后重试。');
+        return;
+      }
+
+      setSubmitSuccess('项目申请已提交成功，我们已将申请内容发送到平台审核邮箱。');
+    } catch (error) {
+      console.error('提交项目申请失败:', error);
+      setSubmitError('提交失败，当前网络或邮件服务可能暂时不可用，请稍后再试。');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -481,7 +546,7 @@ export default function StartProjectPage() {
                       
                       <div>
                         <h4 className="font-semibold text-sm text-muted-foreground mb-1">项目类型</h4>
-                        <Badge variant="outline">{formData.projectType || '（未选择）'}</Badge>
+                        <Badge variant="outline">{projectTypeLabels[formData.projectType] || '（未选择）'}</Badge>
                       </div>
                       
                       <Separator />
@@ -507,6 +572,18 @@ export default function StartProjectPage() {
                       </div>
                     </div>
                   </div>
+
+                  {submitSuccess ? (
+                    <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-200">
+                      {submitSuccess}
+                    </div>
+                  ) : null}
+
+                  {submitError ? (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+                      {submitError}
+                    </div>
+                  ) : null}
 
                   <div className="bg-yellow-50 dark:bg-yellow-950 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
                     <h4 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-2 flex items-center gap-2">
@@ -541,9 +618,9 @@ export default function StartProjectPage() {
                 </Button>
                 
                 {currentStep === totalSteps ? (
-                  <Button onClick={handleSubmit} size="lg">
+                  <Button onClick={handleSubmit} size="lg" disabled={isSubmitting}>
                     <Rocket className="h-5 w-5 mr-2" />
-                    提交申请
+                    {isSubmitting ? '提交中...' : '提交申请'}
                   </Button>
                 ) : (
                   <Button onClick={handleNext}>
