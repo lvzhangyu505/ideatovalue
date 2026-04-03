@@ -140,16 +140,30 @@ export async function POST(request: Request) {
     const body = await request.json();
     const data = projectApplicationSchema.parse(body);
 
-    const smtpHost = process.env.SMTP_HOST;
+    const smtpHost = process.env.SMTP_HOST?.trim();
     const smtpPort = Number.parseInt(process.env.SMTP_PORT || '465', 10);
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-    const mailTo = process.env.PROJECT_APPLICATION_TO || 'lux932519@gmail.com';
-    const mailFrom = process.env.SMTP_FROM || smtpUser;
+    const smtpUser = process.env.SMTP_USER?.trim();
+    const smtpPass = process.env.SMTP_PASS?.trim();
+    const mailTo = process.env.PROJECT_APPLICATION_TO?.trim() || 'lux932519@gmail.com';
+    const mailFrom = process.env.SMTP_FROM?.trim() || smtpUser;
+    const missingEnvVars = [
+      ['SMTP_HOST', smtpHost],
+      ['SMTP_USER', smtpUser],
+      ['SMTP_PASS', smtpPass],
+      ['SMTP_FROM', mailFrom],
+    ]
+      .filter(([, value]) => !value)
+      .map(([key]) => key);
 
-    if (!smtpHost || !smtpUser || !smtpPass || !mailFrom) {
+    if (missingEnvVars.length > 0) {
+      console.error('项目申请邮件环境变量缺失:', {
+        missingEnvVars,
+        vercelEnv: process.env.VERCEL_ENV,
+        nodeEnv: process.env.NODE_ENV,
+      });
+
       return NextResponse.json(
-        { message: '邮件服务尚未配置完成，请先设置 SMTP 环境变量后再提交。' },
+        { message: `邮件服务尚未配置完成，缺少：${missingEnvVars.join('、')}。` },
         { status: 500 }
       );
     }
