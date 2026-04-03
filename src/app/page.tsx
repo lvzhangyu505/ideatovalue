@@ -506,8 +506,8 @@ export default function Home() {
                             <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
                                 <li><Link href="/projects" className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">浏览项目</Link></li>
                                 <li><Link href="/start" className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">发起项目</Link></li>
-                                <li><Link href="/guides" className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">项目指南</Link></li>
-                                <li><Link href="/success" className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">成功案例</Link></li>
+                                <li><Link href="/guide" className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">项目指南</Link></li>
+                                <li><Link href="/cases" className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">成功案例</Link></li>
                             </ul>
                         </div>
                         <div>
