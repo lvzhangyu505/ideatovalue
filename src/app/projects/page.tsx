@@ -331,15 +331,10 @@ function ProjectsPageContent() {
                       </p>
 
                       <div className="flex flex-wrap gap-2">
-                        {project.recommendations.slice(0, 2).map((recommendation) => {
-                          const recommendationLabel = discoveryRecommendedViews.find((view) => view.slug === recommendation)?.label;
-                          return recommendationLabel ? (
-                            <Badge key={recommendation} variant="secondary" className="bg-purple-100/80 text-purple-700 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300">
-                              <Sparkles className="mr-1 h-3 w-3" />
-                              {recommendationLabel}
-                            </Badge>
-                          ) : null;
-                        })}
+                        <Badge variant="secondary" className="bg-purple-100/80 text-purple-700 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300">
+                          <Sparkles className="mr-1 h-3 w-3" />
+                          {project.badgeLabel}
+                        </Badge>
                       </div>
 
                       <div className="space-y-3 rounded-2xl bg-slate-50/80 p-4 dark:bg-slate-950/60">

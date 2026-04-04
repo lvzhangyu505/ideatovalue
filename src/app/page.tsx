@@ -294,7 +294,7 @@ export default function Home() {
                         {featuredProjects.map((project) => (
                             <Card key={project.id} className="group overflow-hidden bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border-purple-100/50 dark:border-purple-900/30 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-300 hover:scale-[1.02] rounded-2xl">
                                 <div className="aspect-video bg-gradient-to-br from-purple-100/50 via-pink-100/50 to-blue-100/50 dark:from-purple-900/30 dark:via-pink-900/30 dark:to-blue-900/30 flex items-center justify-center group-hover:from-purple-200/50 group-hover:via-pink-200/50 group-hover:to-blue-200/50 dark:group-hover:from-purple-800/40 dark:group-hover:via-pink-800/40 dark:group-hover:to-blue-800/40 transition-all duration-500">
-                                    <div className="text-5xl">🎯</div>
+                                    <div className="text-5xl">{project.emoji}</div>
                                 </div>
                                 <CardHeader className="pb-3">
                                     <div className="flex items-start justify-between gap-2 mb-2">
@@ -305,6 +305,9 @@ export default function Home() {
                                             {getSecondaryCategoryLabel(project.primaryCategory, project.secondaryCategory)}
                                         </Badge>
                                     </div>
+                                    <Badge className="w-fit bg-purple-100/80 text-purple-700 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300">
+                                        {project.badgeLabel}
+                                    </Badge>
                                     <CardTitle className="line-clamp-2 text-lg group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
                                         {project.title}
                                     </CardTitle>
@@ -369,11 +372,14 @@ export default function Home() {
                         {latestProjects.map((project) => (
                             <Card key={project.id} className="group overflow-hidden bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border-purple-100/50 dark:border-purple-900/30 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-300 hover:scale-[1.02] rounded-2xl">
                                 <div className="aspect-video bg-gradient-to-br from-blue-100/50 via-purple-100/50 to-pink-100/50 dark:from-blue-900/30 dark:via-purple-900/30 dark:to-pink-900/30 flex items-center justify-center group-hover:from-blue-200/50 group-hover:via-purple-200/50 group-hover:to-pink-200/50 dark:group-hover:from-blue-800/40 dark:group-hover:via-purple-800/40 dark:group-hover:to-pink-800/40 transition-all duration-500">
-                                    <div className="text-5xl">💡</div>
+                                    <div className="text-5xl">{project.emoji}</div>
                                 </div>
                                 <CardHeader className="pb-3">
                                     <Badge variant="outline" className="w-fit mb-2 border-purple-200/50 dark:border-purple-800/50 text-slate-600 dark:text-slate-400">
                                         {discoveryCategories.find((category) => category.slug === project.primaryCategory)?.label}
+                                    </Badge>
+                                    <Badge className="w-fit bg-purple-100/80 text-purple-700 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300">
+                                        {project.badgeLabel}
                                     </Badge>
                                     <CardTitle className="line-clamp-2 text-lg group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
                                         {project.title}
