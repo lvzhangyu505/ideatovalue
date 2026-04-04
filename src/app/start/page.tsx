@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,10 +21,11 @@ import { AuthActions } from '@/components/auth-actions';
 import { useAuthUser } from '@/hooks/use-auth-user';
 import {
   type ProjectApplicationFormData,
+  getProjectSubcategoryOptions,
   PROJECT_TYPE_LABELS,
   PROJECT_TYPE_OPTIONS,
-  saveProjectApplication,
 } from '@/lib/project-applications';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { 
   Rocket, 
   ArrowLeft, 
@@ -41,6 +42,7 @@ const initialFormData: ProjectApplicationFormData = {
   // 第一步：基本信息
   projectName: '',
   projectType: '',
+  projectSubcategory: '',
   description: '',
   
   // 项目逻辑
@@ -68,6 +70,7 @@ const initialFormData: ProjectApplicationFormData = {
 const requiredFieldLabels: Array<[keyof typeof initialFormData, string]> = [
   ['projectName', '项目名称'],
   ['projectType', '项目类型'],
+  ['projectSubcategory', '二级分类'],
   ['description', '项目简介'],
   ['goal', '项目目标'],
   ['problem', '要解决的问题'],
@@ -93,6 +96,10 @@ export default function StartProjectPage() {
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const subcategoryOptions = useMemo(
+    () => getProjectSubcategoryOptions(formData.projectType),
+    [formData.projectType]
+  );
 
   useEffect(() => {
     if (!user) {
@@ -136,6 +143,11 @@ export default function StartProjectPage() {
     setSubmitError('');
     setSubmitSuccess('');
 
+    if (!user) {
+      setSubmitError('请先登录，再提交项目申请。');
+      return;
+    }
+
     const missingFields = requiredFieldLabels
       .filter(([field]) => !formData[field].trim())
       .map(([, label]) => label);
@@ -148,10 +160,21 @@ export default function StartProjectPage() {
     setIsSubmitting(true);
 
     try {
+      const supabase = getSupabaseBrowserClient();
+      const {
+        data: { session },
+      } = (await supabase?.auth.getSession()) ?? { data: { session: null } };
+
+      if (!session?.access_token) {
+        setSubmitError('当前登录状态已失效，请重新登录后再提交。');
+        return;
+      }
+
       const response = await fetch('/api/project-applications', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify(formData),
       });
@@ -162,15 +185,7 @@ export default function StartProjectPage() {
         setSubmitError(result.message || '提交失败，请稍后重试。');
         return;
       }
-
-      saveProjectApplication(formData, {
-        ownerEmail: user?.email,
-        ownerName:
-          typeof user?.user_metadata.display_name === 'string'
-            ? user.user_metadata.display_name
-            : formData.contactName,
-      });
-      setSubmitSuccess('项目申请已提交成功，我们已将申请内容发送到平台审核邮箱。');
+      setSubmitSuccess('项目申请已提交成功，已进入平台审核队列。');
     } catch (error) {
       console.error('提交项目申请失败:', error);
       setSubmitError('提交失败，当前网络或邮件服务可能暂时不可用，请稍后再试。');
@@ -317,13 +332,39 @@ export default function StartProjectPage() {
                     <Label htmlFor="projectType">项目类型 *</Label>
                     <Select
                       value={formData.projectType}
-                      onValueChange={(value) => setFormData({...formData, projectType: value})}
+                      onValueChange={(value) =>
+                        setFormData({
+                          ...formData,
+                          projectType: value,
+                          projectSubcategory: '',
+                        })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="请选择项目类型" />
                       </SelectTrigger>
                       <SelectContent>
                         {PROJECT_TYPE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="projectSubcategory">二级分类 *</Label>
+                    <Select
+                      value={formData.projectSubcategory}
+                      onValueChange={(value) => setFormData({...formData, projectSubcategory: value})}
+                      disabled={!formData.projectType}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={formData.projectType ? '请选择二级分类' : '请先选择项目类型'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {subcategoryOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
                           </SelectItem>
@@ -561,6 +602,9 @@ export default function StartProjectPage() {
                       <div>
                         <h4 className="font-semibold text-sm text-muted-foreground mb-1">项目类型</h4>
                         <Badge variant="outline">{PROJECT_TYPE_LABELS[formData.projectType] || '（未选择）'}</Badge>
+                        <div className="mt-2 text-sm text-muted-foreground">
+                          {subcategoryOptions.find((option) => option.value === formData.projectSubcategory)?.label || '（未选择二级分类）'}
+                        </div>
                       </div>
                       
                       <Separator />

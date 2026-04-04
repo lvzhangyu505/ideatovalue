@@ -3,6 +3,7 @@ import { discoveryCategories } from '@/lib/project-discovery';
 export type ProjectApplicationFormData = {
   projectName: string;
   projectType: string;
+  projectSubcategory: string;
   description: string;
   goal: string;
   problem: string;
@@ -51,6 +52,17 @@ export const PROJECT_TYPE_OPTIONS = discoveryCategories.map((category) => ({
   value: category.slug,
   label: category.label,
 }));
+
+export function getProjectSubcategoryOptions(projectType: string) {
+  return (
+    discoveryCategories
+      .find((category) => category.slug === projectType)
+      ?.secondaryCategories.map((category) => ({
+        value: category.slug,
+        label: category.label,
+      })) ?? []
+  );
+}
 
 export function getStoredProjectApplications(ownerEmail?: string | null) {
   if (typeof window === 'undefined') {

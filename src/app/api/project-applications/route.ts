@@ -2,13 +2,19 @@ import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { z } from 'zod';
 
-import { PROJECT_TYPE_LABELS, PROJECT_TYPE_VALUES } from '@/lib/project-applications';
+import {
+  getProjectSubcategoryOptions,
+  PROJECT_TYPE_LABELS,
+  PROJECT_TYPE_VALUES,
+} from '@/lib/project-applications';
+import { createSupabaseServiceClient, getUserFromAccessToken, isSupabaseServerConfigured } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
 
 const projectApplicationSchema = z.object({
   projectName: z.string().trim().min(1),
   projectType: z.enum(PROJECT_TYPE_VALUES),
+  projectSubcategory: z.string().trim().min(1),
   description: z.string().trim().min(1),
   goal: z.string().trim().min(1),
   problem: z.string().trim().min(1),
@@ -25,6 +31,16 @@ const projectApplicationSchema = z.object({
   contactPhone: z.string().trim().optional().default(''),
 });
 
+function getAuthorizationToken(request: Request) {
+  const header = request.headers.get('authorization');
+
+  if (!header?.startsWith('Bearer ')) {
+    return '';
+  }
+
+  return header.slice('Bearer '.length).trim();
+}
+
 function escapeHtml(value: string) {
   return value
     .replaceAll('&', '&amp;')
@@ -39,10 +55,15 @@ function formatMultilineHtml(value: string) {
 }
 
 function buildTextContent(data: z.infer<typeof projectApplicationSchema>) {
+  const secondaryLabel =
+    getProjectSubcategoryOptions(data.projectType).find((item) => item.value === data.projectSubcategory)?.label ||
+    data.projectSubcategory;
+
   return `ideatovalue 收到新的项目申请
 
 项目名称：${data.projectName}
 项目类型：${PROJECT_TYPE_LABELS[data.projectType]}
+二级分类：${secondaryLabel}
 项目简介：${data.description}
 
 项目目标：
@@ -82,9 +103,14 @@ ${data.timeline}
 }
 
 function buildHtmlContent(data: z.infer<typeof projectApplicationSchema>) {
+  const secondaryLabel =
+    getProjectSubcategoryOptions(data.projectType).find((item) => item.value === data.projectSubcategory)?.label ||
+    data.projectSubcategory;
+
   const sections: Array<[string, string]> = [
     ['项目名称', escapeHtml(data.projectName)],
     ['项目类型', escapeHtml(PROJECT_TYPE_LABELS[data.projectType])],
+    ['二级分类', escapeHtml(secondaryLabel)],
     ['项目简介', formatMultilineHtml(data.description)],
     ['项目目标', formatMultilineHtml(data.goal)],
     ['要解决的问题', formatMultilineHtml(data.problem)],
@@ -131,8 +157,66 @@ function buildHtmlContent(data: z.infer<typeof projectApplicationSchema>) {
 
 export async function POST(request: Request) {
   try {
+    if (!isSupabaseServerConfigured()) {
+      return NextResponse.json(
+        { message: '项目提交流程尚未配置完成，请先补充 Supabase 服务端环境变量。' },
+        { status: 500 }
+      );
+    }
+
+    const accessToken = getAuthorizationToken(request);
+
+    if (!accessToken) {
+      return NextResponse.json({ message: '请先登录，再提交项目申请。' }, { status: 401 });
+    }
+
     const body = await request.json();
     const data = projectApplicationSchema.parse(body);
+    const subcategoryExists = getProjectSubcategoryOptions(data.projectType).some(
+      (item) => item.value === data.projectSubcategory
+    );
+
+    if (!subcategoryExists) {
+      return NextResponse.json({ message: '二级分类与项目类型不匹配，请重新选择。' }, { status: 400 });
+    }
+
+    const user = await getUserFromAccessToken(accessToken);
+
+    if (!user?.email) {
+      return NextResponse.json({ message: '当前登录状态无效，请重新登录。' }, { status: 401 });
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const { error: insertError } = await supabase.from('project_submissions').insert({
+      user_id: user.id,
+      user_email: user.email,
+      user_name:
+        (typeof user.user_metadata.display_name === 'string' && user.user_metadata.display_name.trim()) ||
+        data.contactName,
+      project_name: data.projectName,
+      project_type: data.projectType,
+      project_subcategory: data.projectSubcategory,
+      description: data.description,
+      goal: data.goal,
+      problem: data.problem,
+      audience: data.audience,
+      solution: data.solution,
+      verification: data.verification,
+      existing_resources: data.existingResources,
+      needed_resources: data.neededResources,
+      key_risks: data.keyRisks,
+      risk_responses: data.riskResponses,
+      timeline: data.timeline,
+      contact_name: data.contactName,
+      contact_email: data.contactEmail,
+      contact_phone: data.contactPhone || null,
+      status: 'pending',
+    });
+
+    if (insertError) {
+      console.error('项目申请入库失败:', insertError);
+      return NextResponse.json({ message: '项目已填写完成，但保存申请记录失败，请稍后重试。' }, { status: 500 });
+    }
 
     const smtpHost = process.env.SMTP_HOST?.trim();
     const smtpPort = Number.parseInt(process.env.SMTP_PORT || '465', 10);
@@ -140,46 +224,31 @@ export async function POST(request: Request) {
     const smtpPass = process.env.SMTP_PASS?.trim();
     const mailTo = process.env.PROJECT_APPLICATION_TO?.trim() || 'lux932519@gmail.com';
     const mailFrom = process.env.SMTP_FROM?.trim() || smtpUser;
-    const missingEnvVars = [
-      ['SMTP_HOST', smtpHost],
-      ['SMTP_USER', smtpUser],
-      ['SMTP_PASS', smtpPass],
-      ['SMTP_FROM', mailFrom],
-    ]
-      .filter(([, value]) => !value)
-      .map(([key]) => key);
 
-    if (missingEnvVars.length > 0) {
-      console.error('项目申请邮件环境变量缺失:', {
-        missingEnvVars,
-        vercelEnv: process.env.VERCEL_ENV,
-        nodeEnv: process.env.NODE_ENV,
-      });
+    if (smtpHost && smtpUser && smtpPass && mailFrom) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpPort === 465,
+          auth: {
+            user: smtpUser,
+            pass: smtpPass,
+          },
+        });
 
-      return NextResponse.json(
-        { message: `邮件服务尚未配置完成，缺少：${missingEnvVars.join('、')}。` },
-        { status: 500 }
-      );
+        await transporter.sendMail({
+          from: mailFrom,
+          to: mailTo,
+          replyTo: data.contactEmail,
+          subject: `[ideatovalue] 新项目申请：${data.projectName}`,
+          text: buildTextContent(data),
+          html: buildHtmlContent(data),
+        });
+      } catch (mailError) {
+        console.error('项目申请邮件发送失败，但申请已入库:', mailError);
+      }
     }
-
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
-    });
-
-    await transporter.sendMail({
-      from: mailFrom,
-      to: mailTo,
-      replyTo: data.contactEmail,
-      subject: `[ideatovalue] 新项目申请：${data.projectName}`,
-      text: buildTextContent(data),
-      html: buildHtmlContent(data),
-    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -190,10 +259,9 @@ export async function POST(request: Request) {
       );
     }
 
-    console.error('项目申请邮件发送失败:', error);
-
+    console.error('项目申请提交失败:', error);
     return NextResponse.json(
-      { message: '提交成功前的邮件发送失败，请稍后重试或检查邮件配置。' },
+      { message: '项目申请提交失败，请稍后重试。' },
       { status: 500 }
     );
   }

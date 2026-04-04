@@ -18,11 +18,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthUser } from '@/hooks/use-auth-user';
+import { type ProjectSubmissionRecord, getSubmissionStatusLabel } from '@/lib/project-submissions';
 import {
-  type StoredProjectApplication,
-  getStoredProjectApplications,
+  getProjectSubcategoryOptions,
   PROJECT_TYPE_LABELS,
 } from '@/lib/project-applications';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 function getDisplayName(email: string | undefined, metadataName: unknown) {
   if (typeof metadataName === 'string' && metadataName.trim()) {
@@ -48,11 +49,47 @@ function getInitials(name: string) {
 
 export default function ProfilePage() {
   const { user, isLoading } = useAuthUser();
-  const [applications, setApplications] = useState<StoredProjectApplication[]>([]);
+  const [applications, setApplications] = useState<ProjectSubmissionRecord[]>([]);
 
   useEffect(() => {
-    setApplications(getStoredProjectApplications(user?.email));
-  }, [user?.email]);
+    if (!user) {
+      setApplications([]);
+      return;
+    }
+
+    async function loadApplications() {
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const {
+          data: { session },
+        } = (await supabase?.auth.getSession()) ?? { data: { session: null } };
+
+        if (!session?.access_token) {
+          setApplications([]);
+          return;
+        }
+
+        const response = await fetch('/api/my-project-submissions', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (!response.ok) {
+          setApplications([]);
+          return;
+        }
+
+        const result = (await response.json()) as { submissions?: ProjectSubmissionRecord[] };
+        setApplications(result.submissions || []);
+      } catch (error) {
+        console.error('读取我的项目申请失败:', error);
+        setApplications([]);
+      }
+    }
+
+    void loadApplications();
+  }, [user]);
 
   const displayName = getDisplayName(user?.email, user?.user_metadata.display_name);
   const avatarUrl =
@@ -200,15 +237,15 @@ export default function ProfilePage() {
                   <Card className="rounded-2xl border-purple-100/50 bg-white/70 dark:border-purple-900/30 dark:bg-slate-900/70">
                     <CardHeader className="pb-2">
                       <CardDescription>最近状态</CardDescription>
-                      <CardTitle className="text-2xl">{applications[0]?.reviewStatus ?? '暂无'}</CardTitle>
+                      <CardTitle className="text-2xl">{applications[0] ? getSubmissionStatusLabel(applications[0].status) : '暂无'}</CardTitle>
                     </CardHeader>
                   </Card>
                   <Card className="rounded-2xl border-purple-100/50 bg-white/70 dark:border-purple-900/30 dark:bg-slate-900/70">
                     <CardHeader className="pb-2">
                       <CardDescription>最近提交</CardDescription>
                       <CardTitle className="text-lg">
-                        {applications[0]?.createdAt
-                          ? new Date(applications[0].createdAt).toLocaleDateString('zh-CN')
+                        {applications[0]?.created_at
+                          ? new Date(applications[0].created_at).toLocaleDateString('zh-CN')
                           : '暂无记录'}
                       </CardTitle>
                     </CardHeader>
@@ -219,7 +256,7 @@ export default function ProfilePage() {
                   <CardHeader className="flex flex-row items-center justify-between gap-4">
                     <div>
                       <CardTitle className="text-2xl">我的项目</CardTitle>
-                      <CardDescription>这里先展示你在当前设备提交过的项目申请记录，后续接数据库后可以无缝扩展成正式项目后台。</CardDescription>
+                      <CardDescription>这里展示你提交到平台审核队列中的项目，以及最新审核状态。</CardDescription>
                     </div>
                     <Link href="/start">
                       <Button className="bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600">
@@ -245,18 +282,24 @@ export default function ProfilePage() {
                             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                               <div className="space-y-2">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{application.projectName}</h3>
-                                  <Badge variant="outline">{PROJECT_TYPE_LABELS[application.projectType] ?? application.projectType}</Badge>
+                                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{application.project_name}</h3>
+                                  <Badge variant="outline">{PROJECT_TYPE_LABELS[application.project_type] ?? application.project_type}</Badge>
                                   <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300">
-                                    {application.reviewStatus}
+                                    {getSubmissionStatusLabel(application.status)}
                                   </Badge>
                                 </div>
                                 <p className="line-clamp-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
                                   {application.description}
                                 </p>
+                                <div className="text-sm text-slate-500 dark:text-slate-400">
+                                  二级分类：
+                                  {getProjectSubcategoryOptions(application.project_type).find(
+                                    (item) => item.value === application.project_subcategory
+                                  )?.label ?? application.project_subcategory}
+                                </div>
                               </div>
                               <div className="text-sm text-slate-500 dark:text-slate-400">
-                                提交于 {new Date(application.createdAt).toLocaleString('zh-CN')}
+                                提交于 {new Date(application.created_at).toLocaleString('zh-CN')}
                               </div>
                             </div>
 
@@ -267,7 +310,7 @@ export default function ProfilePage() {
                               </div>
                               <div className="rounded-xl bg-white/80 p-4 dark:bg-slate-900/80">
                                 <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">当前仍需支持</div>
-                                <div className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">{application.neededResources}</div>
+                                <div className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">{application.needed_resources}</div>
                               </div>
                             </div>
                           </div>

@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  type DiscoveryProject,
   discoveryCategories,
   discoveryProjects,
   discoveryProjectStages,
@@ -54,6 +55,25 @@ function ProjectsPageContent() {
   const [selectedStage, setSelectedStage] = useState('all');
   const [selectedView, setSelectedView] = useState('all');
   const [sortBy, setSortBy] = useState<(typeof sortOptions)[number]['value']>('newest');
+  const [publicProjects, setPublicProjects] = useState<DiscoveryProject[]>([]);
+
+  useEffect(() => {
+    async function loadPublicProjects() {
+      try {
+        const response = await fetch('/api/public-projects');
+        if (!response.ok) {
+          return;
+        }
+
+        const result = (await response.json()) as { projects?: DiscoveryProject[] };
+        setPublicProjects(result.projects || []);
+      } catch (error) {
+        console.error('读取公开项目失败:', error);
+      }
+    }
+
+    void loadPublicProjects();
+  }, []);
 
   useEffect(() => {
     const nextPrimaryParam = searchParams.get('primary');
@@ -102,9 +122,10 @@ function ProjectsPageContent() {
   }, [secondaryOptions, selectedSecondary]);
 
   const selectedViewMeta = discoveryRecommendedViews.find((view) => view.slug === selectedView);
+  const allProjects = useMemo(() => [...publicProjects, ...discoveryProjects], [publicProjects]);
 
   const filteredProjects = useMemo(() => {
-    return discoveryProjects.filter((project) => {
+    return allProjects.filter((project) => {
       const normalizedQuery = searchQuery.trim().toLowerCase();
       const matchesSearch =
         !normalizedQuery ||
@@ -119,7 +140,7 @@ function ProjectsPageContent() {
 
       return matchesSearch && matchesPrimary && matchesSecondary && matchesStage && matchesView;
     });
-  }, [searchQuery, selectedPrimary, selectedSecondary, selectedStage, selectedView]);
+  }, [allProjects, searchQuery, selectedPrimary, selectedSecondary, selectedStage, selectedView]);
 
   const sortedProjects = useMemo(() => {
     return [...filteredProjects].sort((left, right) => {

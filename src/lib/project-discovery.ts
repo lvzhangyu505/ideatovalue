@@ -27,7 +27,7 @@ export type DiscoverySupportTier = {
 };
 
 export type DiscoveryProject = {
-  id: number;
+  id: number | string;
   title: string;
   description: string;
   longDescription: string;
@@ -472,6 +472,5 @@ export function getSecondaryCategoryLabel(primarySlug: string, secondarySlug: st
 }
 
 export function getDiscoveryProjectById(projectId: number | string) {
-  const normalizedId = typeof projectId === 'string' ? Number(projectId) : projectId;
-  return discoveryProjects.find((project) => project.id === normalizedId);
+  return discoveryProjects.find((project) => String(project.id) === String(projectId));
 }

@@ -1,492 +1,305 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { ArrowLeft, CheckCircle2, Loader2, ShieldAlert, XCircle } from 'lucide-react';
+
+import { AuthActions } from '@/components/auth-actions';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from '@/components/ui/tabs';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { 
-  Users, 
-  FileText, 
-  CheckCircle2, 
-  AlertTriangle, 
-  Settings, 
-  BarChart3,
-  Search,
-  Eye,
-  Edit,
-  Trash2,
-  ArrowLeft
-} from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { useAuthUser } from '@/hooks/use-auth-user';
+import { getProjectSubcategoryOptions, PROJECT_TYPE_LABELS } from '@/lib/project-applications';
+import { type ProjectSubmissionRecord, getSubmissionStatusLabel } from '@/lib/project-submissions';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
-// 模拟数据
-const projects = [
-  {
-    id: 1,
-    name: '智慧农业物联网系统',
-    creator: '张明',
-    type: '产品型',
-    status: '执行中',
-    amount: 50000,
-    current: 39000,
-    supporters: 156,
-    createdAt: '2025-01-15',
-  },
-  {
-    id: 2,
-    name: '社区青少年编程教育计划',
-    creator: '李华',
-    type: '内容型',
-    status: '审核中',
-    amount: 30000,
-    current: 0,
-    supporters: 0,
-    createdAt: '2025-02-20',
-  },
-  {
-    id: 3,
-    name: '环保材料研发实验室',
-    creator: '王芳',
-    type: '产品型',
-    status: '预警中',
-    amount: 80000,
-    current: 36000,
-    supporters: 89,
-    createdAt: '2025-01-20',
-  },
-  {
-    id: 4,
-    name: '远程办公协作工具',
-    creator: '赵强',
-    type: '产品型',
-    status: '已结项',
-    amount: 60000,
-    current: 72000,
-    supporters: 245,
-    createdAt: '2024-10-15',
-  },
-];
+export default function AdminPage() {
+  const { user, isLoading } = useAuthUser();
+  const [submissions, setSubmissions] = useState<ProjectSubmissionRecord[]>([]);
+  const [error, setError] = useState('');
+  const [reviewNote, setReviewNote] = useState<Record<string, string>>({});
+  const [submittingId, setSubmittingId] = useState('');
 
-const users = [
-  {
-    id: 1,
-    name: '张明',
-    email: 'zhangming@example.com',
-    role: '发起人',
-    projects: 3,
-    status: '正常',
-    joinedAt: '2024-08-15',
-  },
-  {
-    id: 2,
-    name: '李华',
-    email: 'lihua@example.com',
-    role: '成员',
-    projects: 0,
-    status: '正常',
-    joinedAt: '2024-09-20',
-  },
-  {
-    id: 3,
-    name: '王教授',
-    email: 'wang@university.edu.cn',
-    role: '专家',
-    projects: 0,
-    reviews: 15,
-    status: '正常',
-    joinedAt: '2024-07-01',
-  },
-  {
-    id: 4,
-    name: '管理员',
-    email: 'admin@platform.com',
-    role: '管理员',
-    status: '正常',
-    joinedAt: '2024-06-01',
-  },
-];
+  const isAdmin = useMemo(() => {
+    const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '')
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean);
 
-const audits = [
-  {
-    id: 1,
-    projectName: '社区青少年编程教育计划',
-    creator: '李华',
-    type: '产品型',
-    status: '初审中',
-    submittedAt: '2025-02-20',
-    priority: '高',
-  },
-  {
-    id: 2,
-    projectName: '乡村文化纪录片',
-    creator: '刘洋',
-    type: '内容型',
-    status: '共创审核中',
-    submittedAt: '2025-02-18',
-    priority: '中',
-  },
-  {
-    id: 3,
-    projectName: 'AI 辅助写作助手',
-    creator: '陈晨',
-    type: '服务型',
-    status: '待复审',
-    submittedAt: '2025-02-10',
-    priority: '低',
-  },
-];
+    return Boolean(user?.email && adminEmails.includes(user.email.trim().toLowerCase()));
+  }, [user?.email]);
 
-const stats = {
-  totalProjects: 128,
-  auditingProjects: 12,
-  executingProjects: 45,
-  completedProjects: 71,
-  totalUsers: 1256,
-  totalSupporters: 2456,
-  totalAmount: 1250000,
-  refundRequests: 5,
-};
+  async function loadSubmissions() {
+    try {
+      setError('');
+      const supabase = getSupabaseBrowserClient();
+      const {
+        data: { session },
+      } = (await supabase?.auth.getSession()) ?? { data: { session: null } };
 
-export default function AdminDashboard() {
-  const [searchQuery, setSearchQuery] = useState('');
+      if (!session?.access_token) {
+        setError('当前登录状态已失效，请重新登录。');
+        return;
+      }
+
+      const response = await fetch('/api/admin/project-submissions', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const result = (await response.json()) as {
+        message?: string;
+        submissions?: ProjectSubmissionRecord[];
+      };
+
+      if (!response.ok) {
+        setError(result.message || '读取审核列表失败。');
+        return;
+      }
+
+      setSubmissions(result.submissions || []);
+    } catch (fetchError) {
+      console.error('读取审核列表失败:', fetchError);
+      setError('读取审核列表失败，请稍后重试。');
+    }
+  }
+
+  useEffect(() => {
+    if (!user || !isAdmin) {
+      return;
+    }
+
+    void loadSubmissions();
+  }, [isAdmin, user]);
+
+  async function handleReview(submissionId: string, status: 'approved' | 'rejected') {
+    try {
+      setSubmittingId(submissionId);
+      setError('');
+
+      const supabase = getSupabaseBrowserClient();
+      const {
+        data: { session },
+      } = (await supabase?.auth.getSession()) ?? { data: { session: null } };
+
+      if (!session?.access_token) {
+        setError('当前登录状态已失效，请重新登录。');
+        return;
+      }
+
+      const response = await fetch('/api/admin/project-submissions', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          submissionId,
+          status,
+          reviewNote: reviewNote[submissionId] || '',
+        }),
+      });
+
+      const result = (await response.json()) as { message?: string };
+      if (!response.ok) {
+        setError(result.message || '审核操作失败。');
+        return;
+      }
+
+      await loadSubmissions();
+    } catch (reviewError) {
+      console.error('审核操作失败:', reviewError);
+      setError('审核操作失败，请稍后重试。');
+    } finally {
+      setSubmittingId('');
+    }
+  }
+
+  const pendingSubmissions = submissions.filter((submission) => submission.status === 'pending');
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* 顶部导航栏 */}
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2">
-              <BarChart3 className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">管理后台</span>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/30 to-blue-50/20 dark:from-slate-950 dark:via-purple-950/20 dark:to-blue-950/10">
+      <header className="sticky top-0 z-50 border-b border-purple-100/50 bg-white/70 backdrop-blur-xl supports-[backdrop-filter]:bg-white/70 dark:border-purple-900/30 dark:bg-slate-950/70">
+        <div className="container mx-auto px-6 lg:px-12">
+          <div className="flex h-20 items-center justify-between">
+            <Link href="/" className="group flex items-center gap-3">
+              <div className="relative h-10 w-10">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-400 via-purple-500 to-blue-500 opacity-90 blur-[2px]" />
+                <div className="absolute inset-1 rounded-full bg-gradient-to-br from-pink-300 via-purple-400 to-blue-400" />
+                <div className="absolute inset-2 rounded-full bg-white/40 backdrop-blur-sm dark:bg-white/20" />
+              </div>
+              <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-xl font-bold text-transparent transition-all group-hover:from-purple-500 group-hover:to-blue-500">
+                管理后台
+              </span>
             </Link>
-            
-            <nav className="hidden md:flex items-center gap-6">
-              <Link href="/admin" className="text-sm font-medium text-primary transition-colors">
-                数据概览
-              </Link>
-              <Link href="/admin/users" className="text-sm font-medium hover:text-primary transition-colors">
-                用户管理
-              </Link>
-              <Link href="/admin/projects" className="text-sm font-medium hover:text-primary transition-colors">
-                项目管理
-              </Link>
-              <Link href="/admin/audits" className="text-sm font-medium hover:text-primary transition-colors">
-                审核管理
-              </Link>
-            </nav>
-          </div>
 
-          <div className="flex items-center gap-4">
-            <Badge variant="outline">管理员</Badge>
-            <Link href="/">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                返回前台
-              </Button>
-            </Link>
+            <AuthActions />
           </div>
         </div>
       </header>
 
-      {/* 页面标题 */}
-      <section className="border-b bg-muted/30 py-8">
-        <div className="container">
-          <h1 className="text-3xl font-bold mb-2">数据看板</h1>
-          <p className="text-muted-foreground">平台整体运营数据概览</p>
+      <div className="border-b border-purple-100/50 bg-white/50 backdrop-blur-sm dark:border-purple-900/30 dark:bg-slate-950/50">
+        <div className="container mx-auto px-6 py-3 lg:px-12">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-sm text-slate-600 transition-colors hover:text-purple-600 dark:text-slate-400 dark:hover:text-purple-400"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            返回首页
+          </Link>
+        </div>
+      </div>
+
+      <section className="border-b border-purple-100/50 bg-gradient-to-br from-purple-50/50 via-transparent to-blue-50/50 py-12 dark:border-purple-900/30 dark:from-purple-950/20 dark:to-blue-950/20">
+        <div className="container mx-auto px-6 lg:px-12">
+          <h1 className="bg-gradient-to-r from-slate-800 via-purple-700 to-blue-700 bg-clip-text text-3xl font-bold text-transparent dark:from-slate-100 dark:via-purple-300 dark:to-blue-300 md:text-4xl">
+            项目审核后台
+          </h1>
+          <p className="mt-2 text-slate-600 dark:text-slate-400">审核注册用户提交的项目申请，通过后项目会自动进入公开发现页。</p>
         </div>
       </section>
 
-      {/* 统计卡片 */}
-      <section className="py-8">
-        <div className="container">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">总项目数</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
+      <section className="py-10">
+        <div className="container mx-auto px-6 lg:px-12">
+          {isLoading ? (
+            <div className="h-40 rounded-3xl bg-white/60 dark:bg-slate-900/60" />
+          ) : !user ? (
+            <Card className="mx-auto max-w-2xl rounded-3xl border-purple-100/50 bg-white/70 shadow-xl shadow-purple-500/10 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/70">
+              <CardHeader>
+                <CardTitle>请先登录管理员账号</CardTitle>
+                <CardDescription>登录后才能查看待审核项目列表。</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalProjects}</div>
-                <p className="text-xs text-muted-foreground">
-                  审核中 {stats.auditingProjects} · 执行中 {stats.executingProjects}
-                </p>
-              </CardContent>
             </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">已结项</CardTitle>
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
+          ) : !isAdmin ? (
+            <Card className="mx-auto max-w-2xl rounded-3xl border-red-200/60 bg-white/70 shadow-xl shadow-red-500/10 backdrop-blur-xl dark:border-red-900/30 dark:bg-slate-900/70">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldAlert className="h-5 w-5 text-red-500" />
+                  当前账号没有管理权限
+                </CardTitle>
+                <CardDescription>
+                  请把你的邮箱加入 `ADMIN_EMAILS` 环境变量，例如 `lux932519@gmail.com`。
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{stats.completedProjects}</div>
-                <p className="text-xs text-muted-foreground">
-                  结项率 {((stats.completedProjects / stats.totalProjects) * 100).toFixed(1)}%
-                </p>
-              </CardContent>
             </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">支持人次</CardTitle>
-                <Users className="h-4 w-4 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalSupporters}</div>
-                <p className="text-xs text-muted-foreground">
-                  涉及金额 ¥{stats.totalAmount.toLocaleString()}
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">退款申请</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-orange-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600">{stats.refundRequests}</div>
-                <p className="text-xs text-muted-foreground">
-                  待处理
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card className="rounded-2xl border-purple-100/50 bg-white/70 dark:border-purple-900/30 dark:bg-slate-900/70">
+                  <CardHeader className="pb-2">
+                    <CardDescription>待审核</CardDescription>
+                    <CardTitle className="text-3xl">{pendingSubmissions.length}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card className="rounded-2xl border-purple-100/50 bg-white/70 dark:border-purple-900/30 dark:bg-slate-900/70">
+                  <CardHeader className="pb-2">
+                    <CardDescription>已通过</CardDescription>
+                    <CardTitle className="text-3xl">{submissions.filter((item) => item.status === 'approved').length}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card className="rounded-2xl border-purple-100/50 bg-white/70 dark:border-purple-900/30 dark:bg-slate-900/70">
+                  <CardHeader className="pb-2">
+                    <CardDescription>未通过</CardDescription>
+                    <CardTitle className="text-3xl">{submissions.filter((item) => item.status === 'rejected').length}</CardTitle>
+                  </CardHeader>
+                </Card>
+              </div>
 
-          {/* 标签页 */}
-          <Tabs defaultValue="projects" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="projects">项目管理</TabsTrigger>
-              <TabsTrigger value="users">用户管理</TabsTrigger>
-              <TabsTrigger value="audits">审核管理</TabsTrigger>
-              <TabsTrigger value="refunds">退款处理</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="projects" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>项目列表</CardTitle>
-                      <CardDescription>管理所有项目的状态和信息</CardDescription>
-                    </div>
-                    <div className="relative w-64">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="搜索项目..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-8"
-                      />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>项目名称</TableHead>
-                        <TableHead>发起人</TableHead>
-                        <TableHead>类型</TableHead>
-                        <TableHead>状态</TableHead>
-                        <TableHead>支持进度</TableHead>
-                        <TableHead>支持人数</TableHead>
-                        <TableHead>创建时间</TableHead>
-                        <TableHead className="text-right">操作</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {projects.map((project) => (
-                        <TableRow key={project.id}>
-                          <TableCell className="font-medium">{project.name}</TableCell>
-                          <TableCell>{project.creator}</TableCell>
-                          <TableCell>{project.type}</TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={
-                                project.status === '执行中' ? 'default' :
-                                project.status === '审核中' ? 'secondary' :
-                                project.status === '预警中' ? 'destructive' :
-                                'outline'
-                              }
-                            >
-                              {project.status}
+              {error ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+                  {error}
+                </div>
+              ) : null}
+
+              <div className="grid gap-5">
+                {submissions.map((submission) => (
+                  <Card key={submission.id} className="rounded-3xl border-purple-100/50 bg-white/70 shadow-xl shadow-purple-500/10 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/70">
+                    <CardHeader>
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <CardTitle className="text-2xl">{submission.project_name}</CardTitle>
+                            <Badge variant="outline">{PROJECT_TYPE_LABELS[submission.project_type] ?? submission.project_type}</Badge>
+                            <Badge variant="outline">
+                              {getProjectSubcategoryOptions(submission.project_type).find(
+                                (item) => item.value === submission.project_subcategory
+                              )?.label ?? submission.project_subcategory}
                             </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {project.current > 0 ? (
-                              <span>{((project.current / project.amount) * 100).toFixed(0)}%</span>
-                            ) : (
-                              <span>-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>{project.supporters}</TableCell>
-                          <TableCell>{project.createdAt}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button variant="ghost" size="icon">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon">
-                                <Settings className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="users" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>用户列表</CardTitle>
-                  <CardDescription>管理用户账户、角色和权限</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>用户名</TableHead>
-                        <TableHead>邮箱</TableHead>
-                        <TableHead>角色</TableHead>
-                        <TableHead>状态</TableHead>
-                        <TableHead>参与项目</TableHead>
-                        <TableHead>注册时间</TableHead>
-                        <TableHead className="text-right">操作</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium">{user.name}</TableCell>
-                          <TableCell>{user.email}</TableCell>
-                          <TableCell>
-                            <Badge variant={user.role === '管理员' ? 'default' : 'outline'}>
-                              {user.role}
+                            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300">
+                              {getSubmissionStatusLabel(submission.status)}
                             </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="bg-green-50 text-green-700">
-                              {user.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{user.projects || user.reviews}</TableCell>
-                          <TableCell>{user.joinedAt}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button variant="ghost" size="icon">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon">
-                                <Settings className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="audits" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>审核队列</CardTitle>
-                  <CardDescription>待审核的项目申请</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>项目名称</TableHead>
-                        <TableHead>发起人</TableHead>
-                        <TableHead>类型</TableHead>
-                        <TableHead>状态</TableHead>
-                        <TableHead>优先级</TableHead>
-                        <TableHead>提交时间</TableHead>
-                        <TableHead className="text-right">操作</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {audits.map((audit) => (
-                        <TableRow key={audit.id}>
-                          <TableCell className="font-medium">{audit.projectName}</TableCell>
-                          <TableCell>{audit.creator}</TableCell>
-                          <TableCell>{audit.type}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{audit.status}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={
-                                audit.priority === '高' ? 'destructive' :
-                                audit.priority === '中' ? 'default' :
-                                'outline'
-                              }
-                            >
-                              {audit.priority}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{audit.submittedAt}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button variant="ghost" size="sm">
-                                <Eye className="h-4 w-4 mr-1" />
-                                查看
-                              </Button>
-                              <Button size="sm">
-                                审核
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="refunds" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>退款处理</CardTitle>
-                  <CardDescription>处理用户的退款申请</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-12 text-muted-foreground">
-                    <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>暂无退款申请</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                          </div>
+                          <CardDescription>
+                            发起人：{submission.user_name} · {submission.user_email}
+                          </CardDescription>
+                        </div>
+                        <div className="text-sm text-slate-500 dark:text-slate-400">
+                          提交于 {new Date(submission.created_at).toLocaleString('zh-CN')}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="rounded-2xl bg-slate-50/80 p-4 dark:bg-slate-950/60">
+                          <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">项目简介</div>
+                          <div className="mt-2 text-sm leading-7 text-slate-700 dark:text-slate-300">{submission.description}</div>
+                        </div>
+                        <div className="rounded-2xl bg-slate-50/80 p-4 dark:bg-slate-950/60">
+                          <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">项目目标</div>
+                          <div className="mt-2 text-sm leading-7 text-slate-700 dark:text-slate-300">{submission.goal}</div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl bg-slate-50/80 p-4 dark:bg-slate-950/60">
+                        <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">审核备注</div>
+                        <Textarea
+                          className="mt-3"
+                          rows={3}
+                          value={reviewNote[submission.id] || submission.review_note || ''}
+                          onChange={(event) =>
+                            setReviewNote((current) => ({
+                              ...current,
+                              [submission.id]: event.target.value,
+                            }))
+                          }
+                          placeholder="可选：补充审核意见"
+                        />
+                      </div>
+
+                      {submission.status === 'pending' ? (
+                        <div className="flex flex-wrap gap-3">
+                          <Button
+                            onClick={() => handleReview(submission.id, 'approved')}
+                            disabled={submittingId === submission.id}
+                            className="bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600"
+                          >
+                            {submittingId === submission.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                            通过并公开
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => handleReview(submission.id, 'rejected')}
+                            disabled={submittingId === submission.id}
+                            className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/20"
+                          >
+                            {submittingId === submission.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
+                            驳回
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-slate-500 dark:text-slate-400">
+                          {submission.reviewer_email ? `审核人：${submission.reviewer_email}` : null}
+                          {submission.reviewed_at ? ` · 审核时间：${new Date(submission.reviewed_at).toLocaleString('zh-CN')}` : null}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
     </div>

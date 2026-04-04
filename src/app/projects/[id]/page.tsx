@@ -19,11 +19,14 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import {
   discoveryProjects,
+  type DiscoveryProject,
   getDiscoveryCategory,
   getDiscoveryProjectById,
   getDiscoveryStageLabel,
   getSecondaryCategoryLabel,
 } from '@/lib/project-discovery';
+import { fromPublicProjectId, mapSubmissionToDiscoveryProject, type ProjectSubmissionRecord } from '@/lib/project-submissions';
+import { createSupabaseServiceClient, isSupabaseServerConfigured } from '@/lib/supabase/server';
 
 const stageStyles: Record<string, string> = {
   applying: 'bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200',
@@ -40,13 +43,44 @@ export function generateStaticParams() {
   }));
 }
 
+async function getProjectForDetail(id: string): Promise<DiscoveryProject | null> {
+  const staticProject = getDiscoveryProjectById(id);
+  if (staticProject) {
+    return staticProject;
+  }
+
+  const submissionId = fromPublicProjectId(id);
+  if (!submissionId || !isSupabaseServerConfigured()) {
+    return null;
+  }
+
+  try {
+    const supabase = createSupabaseServiceClient();
+    const { data, error } = await supabase
+      .from('project_submissions')
+      .select('*')
+      .eq('id', submissionId)
+      .eq('status', 'approved')
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return mapSubmissionToDiscoveryProject(data as ProjectSubmissionRecord);
+  } catch (error) {
+    console.error('读取公开项目详情失败:', error);
+    return null;
+  }
+}
+
 export default async function ProjectDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const project = getDiscoveryProjectById(id);
+  const project = await getProjectForDetail(id);
 
   if (!project) {
     notFound();
@@ -248,22 +282,28 @@ export default async function ProjectDetailPage({
                     <CardTitle>支持档位</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {project.tiers.map((tier, index) => (
-                      <div key={`${project.id}-${tier.amount}`}>
-                        <div className="rounded-2xl bg-slate-50/80 p-4 dark:bg-slate-950/60">
-                          <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                            {tier.amount} 元
-                          </div>
-                          <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-400">
-                            {tier.description}
-                          </p>
-                          <Button className="mt-4 w-full rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600">
-                            选择这个档位
-                          </Button>
-                        </div>
-                        {index !== project.tiers.length - 1 ? <Separator className="my-4" /> : null}
+                    {project.tiers.length === 0 ? (
+                      <div className="rounded-2xl bg-slate-50/80 p-4 text-sm leading-7 text-slate-600 dark:bg-slate-950/60 dark:text-slate-400">
+                        该项目已通过审核并公开展示，正式支持档位将在发起人补充后开放。
                       </div>
-                    ))}
+                    ) : (
+                      project.tiers.map((tier, index) => (
+                        <div key={`${project.id}-${tier.amount}`}>
+                          <div className="rounded-2xl bg-slate-50/80 p-4 dark:bg-slate-950/60">
+                            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                              {tier.amount} 元
+                            </div>
+                            <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-400">
+                              {tier.description}
+                            </p>
+                            <Button className="mt-4 w-full rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600">
+                              选择这个档位
+                            </Button>
+                          </div>
+                          {index !== project.tiers.length - 1 ? <Separator className="my-4" /> : null}
+                        </div>
+                      ))
+                    )}
                   </CardContent>
                 </Card>
               </div>
