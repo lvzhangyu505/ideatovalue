@@ -20,7 +20,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  buildDiscoveryHref,
   discoveryCategories,
   discoveryProjects,
   discoveryProjectStages,
@@ -169,35 +168,6 @@ function ProjectsPageContent() {
         </div>
       </header>
 
-      <section className="border-b border-purple-100/50 bg-gradient-to-br from-purple-50/50 via-transparent to-blue-50/50 py-12 dark:border-purple-900/30 dark:from-purple-950/20 dark:to-blue-950/20">
-        <div className="container mx-auto px-6 lg:px-12">
-          <div className="max-w-4xl">
-            <Badge className="mb-4 bg-white/80 text-purple-700 shadow-sm hover:bg-white dark:bg-slate-900/80 dark:text-purple-300">
-              Kickstarter 风格发现导航
-            </Badge>
-            <h1 className="bg-gradient-to-r from-slate-800 via-purple-700 to-blue-700 bg-clip-text text-3xl font-bold text-transparent dark:from-slate-100 dark:via-purple-300 dark:to-blue-300 md:text-5xl">
-              发现项目
-            </h1>
-            <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600 dark:text-slate-400 md:text-lg">
-              从一级分类进入，再缩小到二级方向、项目阶段和推荐入口，快速发现你真正想支持的项目。
-            </p>
-          </div>
-
-          <div className="mt-8 flex flex-wrap gap-3">
-            {discoveryRecommendedViews.map((view) => (
-              <Link key={view.slug} href={buildDiscoveryHref({ view: view.slug })}>
-                <Badge
-                  variant={selectedView === view.slug ? 'default' : 'outline'}
-                  className={selectedView === view.slug ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white' : ''}
-                >
-                  {view.label}
-                </Badge>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section className="sticky top-20 z-40 border-b border-purple-100/50 bg-white/65 py-5 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-950/65">
         <div className="container mx-auto px-6 lg:px-12">
           <div className="flex flex-col gap-4">
@@ -211,36 +181,74 @@ function ProjectsPageContent() {
               />
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Select value={selectedPrimary} onValueChange={setSelectedPrimary}>
-                <SelectTrigger className="w-[160px] rounded-full bg-white/85 dark:bg-slate-900/75">
-                  <SelectValue placeholder="一级分类" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部一级分类</SelectItem>
-                  {discoveryCategories.map((category) => (
-                    <SelectItem key={category.slug} value={category.slug}>
-                      {category.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="-mx-1 overflow-x-auto pb-1">
+              <div className="flex min-w-max items-center gap-2 px-1">
+                <Button
+                  variant={selectedPrimary === 'all' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedPrimary('all')}
+                  className={
+                    selectedPrimary === 'all'
+                      ? 'rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white'
+                      : 'rounded-full bg-white/85 dark:bg-slate-900/75'
+                  }
+                >
+                  全部
+                </Button>
+                {discoveryCategories.map((category) => (
+                  <Button
+                    key={category.slug}
+                    variant={selectedPrimary === category.slug ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedPrimary(category.slug)}
+                    className={
+                      selectedPrimary === category.slug
+                        ? 'rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white'
+                        : 'rounded-full bg-white/85 dark:bg-slate-900/75'
+                    }
+                  >
+                    {category.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
 
-              <Select value={selectedSecondary} onValueChange={setSelectedSecondary}>
-                <SelectTrigger className="w-[180px] rounded-full bg-white/85 dark:bg-slate-900/75">
-                  <SelectValue placeholder="二级分类" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部二级分类</SelectItem>
-                  {secondaryOptions.map((secondary) => (
-                    <SelectItem key={`${secondary.primarySlug}-${secondary.slug}`} value={secondary.slug}>
-                      {selectedPrimary === 'all'
-                        ? `${secondary.primaryLabel} · ${secondary.label}`
-                        : secondary.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={selectedSecondary === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedSecondary('all')}
+                className={
+                  selectedSecondary === 'all'
+                    ? 'rounded-full bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                    : 'rounded-full bg-white/85 dark:bg-slate-900/75'
+                }
+              >
+                全部二级分类
+              </Button>
+              {secondaryOptions.map((secondary) => (
+                <Button
+                  key={`${secondary.primarySlug}-${secondary.slug}`}
+                  variant={selectedSecondary === secondary.slug ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedSecondary(secondary.slug)}
+                  className={
+                    selectedSecondary === secondary.slug
+                      ? 'rounded-full bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                      : 'rounded-full bg-white/85 dark:bg-slate-900/75'
+                  }
+                >
+                  {secondary.label}
+                </Button>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              {selectedView !== 'all' ? (
+                <Badge className="h-10 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 px-4 text-white">
+                  当前推荐入口：{selectedViewMeta?.label ?? selectedView}
+                </Badge>
+              ) : null}
 
               <Select value={selectedStage} onValueChange={setSelectedStage}>
                 <SelectTrigger className="w-[160px] rounded-full bg-white/85 dark:bg-slate-900/75">
