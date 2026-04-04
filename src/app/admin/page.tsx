@@ -15,7 +15,7 @@ import { type ProjectSubmissionRecord, getSubmissionStatusLabel } from '@/lib/pr
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export default function AdminPage() {
-  const { user, isLoading } = useAuthUser();
+  const { user, isLoading, isConfigured } = useAuthUser();
   const [submissions, setSubmissions] = useState<ProjectSubmissionRecord[]>([]);
   const [error, setError] = useState('');
   const [reviewNote, setReviewNote] = useState<Record<string, string>>({});
@@ -165,6 +165,18 @@ export default function AdminPage() {
         <div className="container mx-auto px-6 lg:px-12">
           {isLoading ? (
             <div className="h-40 rounded-3xl bg-white/60 dark:bg-slate-900/60" />
+          ) : !isConfigured ? (
+            <Card className="mx-auto max-w-2xl rounded-3xl border-amber-200/60 bg-white/70 shadow-xl shadow-amber-500/10 backdrop-blur-xl dark:border-amber-900/30 dark:bg-slate-900/70">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldAlert className="h-5 w-5 text-amber-500" />
+                  登录功能尚未配置完成
+                </CardTitle>
+                <CardDescription>
+                  当前部署还没有拿到 `NEXT_PUBLIC_SUPABASE_URL` 和 `NEXT_PUBLIC_SUPABASE_ANON_KEY`，请确认它们已经加到正在服务你域名的 Vercel 项目里，并重新部署。
+                </CardDescription>
+              </CardHeader>
+            </Card>
           ) : !user ? (
             <Card className="mx-auto max-w-2xl rounded-3xl border-purple-100/50 bg-white/70 shadow-xl shadow-purple-500/10 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/70">
               <CardHeader>

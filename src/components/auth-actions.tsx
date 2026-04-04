@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FolderKanban, LogOut, UserRound } from 'lucide-react';
+import { FolderKanban, LogOut, ShieldCheck, UserRound } from 'lucide-react';
 
 import { useAuthUser } from '@/hooks/use-auth-user';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
@@ -46,6 +46,12 @@ function getInitials(name: string) {
 export function AuthActions() {
   const router = useRouter();
   const { user, isLoading } = useAuthUser();
+
+  const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  const isAdmin = Boolean(user?.email && adminEmails.includes(user.email.trim().toLowerCase()));
 
   const handleSignOut = async () => {
     const supabase = getSupabaseBrowserClient();
@@ -134,6 +140,14 @@ export function AuthActions() {
             发起新项目
           </Link>
         </DropdownMenuItem>
+        {isAdmin ? (
+          <DropdownMenuItem asChild className="rounded-xl px-3 py-2">
+            <Link href="/admin">
+              <ShieldCheck className="h-4 w-4" />
+              审核后台
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="rounded-xl px-3 py-2 text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
