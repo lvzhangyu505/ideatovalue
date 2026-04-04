@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ShieldAlert, UserPlus } from 'lucide-react';
 
+import { AuthActions } from '@/components/auth-actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -105,17 +106,7 @@ export default function RegisterPage() {
               </Link>
             </nav>
 
-            <div className="flex items-center gap-4">
-              <Link href="/login">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-slate-600 transition-all hover:bg-purple-50 hover:text-purple-600 dark:text-slate-300 dark:hover:bg-purple-900/20 dark:hover:text-purple-400"
-                >
-                  登录
-                </Button>
-              </Link>
-            </div>
+            <AuthActions />
           </div>
         </div>
       </header>

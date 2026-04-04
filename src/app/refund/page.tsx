@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AuthActions } from '@/components/auth-actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -39,14 +40,7 @@ export default function RefundPage() {
             </nav>
           </div>
 
-          <div className="flex items-center gap-4">
-            <Link href="/login">
-              <Button variant="ghost" size="sm">登录</Button>
-            </Link>
-            <Link href="/register">
-              <Button size="sm">注册</Button>
-            </Link>
-          </div>
+          <AuthActions />
         </div>
       </header>
 

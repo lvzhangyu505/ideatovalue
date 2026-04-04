@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft, CircleHelp, FileSearch, ShieldAlert } from 'lucide-react';
 
+import { AuthActions } from '@/components/auth-actions';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -86,25 +87,7 @@ export default function FaqPage() {
               </Link>
             </nav>
 
-            <div className="flex items-center gap-4">
-              <Link href="/login">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-slate-600 transition-all hover:bg-purple-50 hover:text-purple-600 dark:text-slate-300 dark:hover:bg-purple-900/20 dark:hover:text-purple-400"
-                >
-                  登录
-                </Button>
-              </Link>
-              <Link href="/register">
-                <Button
-                  size="sm"
-                  className="bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/25 transition-all hover:scale-105 hover:from-purple-600 hover:to-blue-600 hover:shadow-purple-500/40"
-                >
-                  注册
-                </Button>
-              </Link>
-            </div>
+            <AuthActions />
           </div>
         </div>
       </header>

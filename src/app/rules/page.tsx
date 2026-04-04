@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AuthActions } from '@/components/auth-actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -51,18 +52,7 @@ export default function RulesPage() {
             </nav>
 
             {/* 右侧操作区 */}
-            <div className="flex items-center gap-4">
-              <Link href="/login">
-                <Button variant="ghost" size="sm" className="text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all">
-                  登录
-                </Button>
-              </Link>
-              <Link href="/register">
-                <Button size="sm" className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg shadow-purple-500/25 transition-all hover:shadow-purple-500/40 hover:scale-105">
-                  注册
-                </Button>
-              </Link>
-            </div>
+            <AuthActions />
           </div>
         </div>
       </header>

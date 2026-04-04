@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, LogIn, Mail, ShieldAlert } from 'lucide-react';
 
+import { AuthActions } from '@/components/auth-actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -83,16 +84,7 @@ export default function LoginPage() {
               </Link>
             </nav>
 
-            <div className="flex items-center gap-4">
-              <Link href="/register">
-                <Button
-                  size="sm"
-                  className="bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/25 transition-all hover:scale-105 hover:from-purple-600 hover:to-blue-600 hover:shadow-purple-500/40"
-                >
-                  注册
-                </Button>
-              </Link>
-            </div>
+            <AuthActions />
           </div>
         </div>
       </header>

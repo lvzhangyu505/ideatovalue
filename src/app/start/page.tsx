@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +17,13 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { AuthActions } from '@/components/auth-actions';
+import { useAuthUser } from '@/hooks/use-auth-user';
+import {
+  type ProjectApplicationFormData,
+  PROJECT_TYPE_LABELS,
+  saveProjectApplication,
+} from '@/lib/project-applications';
 import { 
   Rocket, 
   ArrowLeft, 
@@ -29,7 +36,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 
-const initialFormData = {
+const initialFormData: ProjectApplicationFormData = {
   // 第一步：基本信息
   projectName: '',
   projectType: '',
@@ -57,14 +64,6 @@ const initialFormData = {
   contactPhone: '',
 };
 
-const projectTypeLabels: Record<string, string> = {
-  content: '内容型',
-  activity: '活动型',
-  product: '产品型',
-  service: '服务型',
-  experiment: '社群实验型',
-};
-
 const requiredFieldLabels: Array<[keyof typeof initialFormData, string]> = [
   ['projectName', '项目名称'],
   ['projectType', '项目类型'],
@@ -84,6 +83,7 @@ const requiredFieldLabels: Array<[keyof typeof initialFormData, string]> = [
 ];
 
 export default function StartProjectPage() {
+  const { user } = useAuthUser();
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 6;
 
@@ -92,6 +92,23 @@ export default function StartProjectPage() {
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const displayName =
+      typeof user.user_metadata.display_name === 'string' && user.user_metadata.display_name.trim()
+        ? user.user_metadata.display_name.trim()
+        : '';
+
+    setFormData((current) => ({
+      ...current,
+      contactName: current.contactName || displayName,
+      contactEmail: current.contactEmail || user.email || '',
+    }));
+  }, [user]);
 
   const steps = [
     { id: 1, title: '基本信息', icon: FileText },
@@ -145,6 +162,13 @@ export default function StartProjectPage() {
         return;
       }
 
+      saveProjectApplication(formData, {
+        ownerEmail: user?.email,
+        ownerName:
+          typeof user?.user_metadata.display_name === 'string'
+            ? user.user_metadata.display_name
+            : formData.contactName,
+      });
       setSubmitSuccess('项目申请已提交成功，我们已将申请内容发送到平台审核邮箱。');
     } catch (error) {
       console.error('提交项目申请失败:', error);
@@ -187,18 +211,7 @@ export default function StartProjectPage() {
             </nav>
 
             {/* 右侧操作区 */}
-            <div className="flex items-center gap-4">
-              <Link href="/login">
-                <Button variant="ghost" size="sm" className="text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all">
-                  登录
-                </Button>
-              </Link>
-              <Link href="/register">
-                <Button size="sm" className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg shadow-purple-500/25 transition-all hover:shadow-purple-500/40 hover:scale-105">
-                  注册
-                </Button>
-              </Link>
-            </div>
+            <AuthActions />
           </div>
         </div>
       </header>
@@ -546,7 +559,7 @@ export default function StartProjectPage() {
                       
                       <div>
                         <h4 className="font-semibold text-sm text-muted-foreground mb-1">项目类型</h4>
-                        <Badge variant="outline">{projectTypeLabels[formData.projectType] || '（未选择）'}</Badge>
+                        <Badge variant="outline">{PROJECT_TYPE_LABELS[formData.projectType] || '（未选择）'}</Badge>
                       </div>
                       
                       <Separator />
