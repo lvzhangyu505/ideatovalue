@@ -47,16 +47,26 @@ const sortOptions = [
 
 function ProjectsPageContent() {
   const searchParams = useSearchParams();
+  const defaultPrimary = discoveryCategories[0]?.slug ?? '';
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPrimary, setSelectedPrimary] = useState('all');
-  const [selectedSecondary, setSelectedSecondary] = useState('all');
+  const [selectedPrimary, setSelectedPrimary] = useState(defaultPrimary);
+  const [selectedSecondary, setSelectedSecondary] = useState('');
   const [selectedStage, setSelectedStage] = useState('all');
   const [selectedView, setSelectedView] = useState('all');
   const [sortBy, setSortBy] = useState<(typeof sortOptions)[number]['value']>('newest');
 
   useEffect(() => {
-    setSelectedPrimary(searchParams.get('primary') || 'all');
-    setSelectedSecondary(searchParams.get('secondary') || 'all');
+    const nextPrimaryParam = searchParams.get('primary');
+    const nextPrimary =
+      nextPrimaryParam && getDiscoveryCategory(nextPrimaryParam) ? nextPrimaryParam : defaultPrimary;
+    const nextSecondaryParam = searchParams.get('secondary') || '';
+    const nextCategory = getDiscoveryCategory(nextPrimary);
+    const nextSecondary = nextCategory?.secondaryCategories.some((secondary) => secondary.slug === nextSecondaryParam)
+      ? nextSecondaryParam
+      : '';
+
+    setSelectedPrimary(nextPrimary);
+    setSelectedSecondary(nextSecondary);
     setSelectedStage(searchParams.get('stage') || 'all');
     setSelectedView(searchParams.get('view') || 'all');
 
@@ -66,19 +76,9 @@ function ProjectsPageContent() {
     } else {
       setSortBy('newest');
     }
-  }, [searchParams]);
+  }, [defaultPrimary, searchParams]);
 
   const secondaryOptions = useMemo(() => {
-    if (selectedPrimary === 'all') {
-      return discoveryCategories.flatMap((category) =>
-        category.secondaryCategories.map((secondary) => ({
-          ...secondary,
-          primaryLabel: category.label,
-          primarySlug: category.slug,
-        }))
-      );
-    }
-
     const currentCategory = getDiscoveryCategory(selectedPrimary);
     return (
       currentCategory?.secondaryCategories.map((secondary) => ({
@@ -90,14 +90,14 @@ function ProjectsPageContent() {
   }, [selectedPrimary]);
 
   useEffect(() => {
-    if (selectedSecondary === 'all') {
+    if (!selectedSecondary) {
       return;
     }
 
     const currentSecondaryExists = secondaryOptions.some((secondary) => secondary.slug === selectedSecondary);
 
     if (!currentSecondaryExists) {
-      setSelectedSecondary('all');
+      setSelectedSecondary('');
     }
   }, [secondaryOptions, selectedSecondary]);
 
@@ -112,8 +112,8 @@ function ProjectsPageContent() {
         project.description.toLowerCase().includes(normalizedQuery) ||
         project.creator.toLowerCase().includes(normalizedQuery);
 
-      const matchesPrimary = selectedPrimary === 'all' || project.primaryCategory === selectedPrimary;
-      const matchesSecondary = selectedSecondary === 'all' || project.secondaryCategory === selectedSecondary;
+      const matchesPrimary = !selectedPrimary || project.primaryCategory === selectedPrimary;
+      const matchesSecondary = !selectedSecondary || project.secondaryCategory === selectedSecondary;
       const matchesStage = selectedStage === 'all' || project.stage === selectedStage;
       const matchesView = selectedView === 'all' || project.recommendations.includes(selectedView);
 
@@ -183,24 +183,15 @@ function ProjectsPageContent() {
 
             <div className="-mx-1 overflow-x-auto pb-1">
               <div className="flex min-w-max items-center gap-2 px-1">
-                <Button
-                  variant={selectedPrimary === 'all' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSelectedPrimary('all')}
-                  className={
-                    selectedPrimary === 'all'
-                      ? 'rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white'
-                      : 'rounded-full bg-white/85 dark:bg-slate-900/75'
-                  }
-                >
-                  全部
-                </Button>
                 {discoveryCategories.map((category) => (
                   <Button
                     key={category.slug}
                     variant={selectedPrimary === category.slug ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setSelectedPrimary(category.slug)}
+                    onClick={() => {
+                      setSelectedPrimary(category.slug);
+                      setSelectedSecondary('');
+                    }}
                     className={
                       selectedPrimary === category.slug
                         ? 'rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white'
@@ -214,18 +205,6 @@ function ProjectsPageContent() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant={selectedSecondary === 'all' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedSecondary('all')}
-                className={
-                  selectedSecondary === 'all'
-                    ? 'rounded-full bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                    : 'rounded-full bg-white/85 dark:bg-slate-900/75'
-                }
-              >
-                全部二级分类
-              </Button>
               {secondaryOptions.map((secondary) => (
                 <Button
                   key={`${secondary.primarySlug}-${secondary.slug}`}
@@ -301,7 +280,7 @@ function ProjectsPageContent() {
               )}
             </div>
 
-            {(selectedView !== 'all' || selectedPrimary !== 'all' || selectedSecondary !== 'all' || selectedStage !== 'all' || searchQuery) ? (
+            {(selectedView !== 'all' || selectedPrimary !== defaultPrimary || !!selectedSecondary || selectedStage !== 'all' || searchQuery) ? (
               <Link href="/projects">
                 <Button variant="outline" className="rounded-full">
                   清空筛选

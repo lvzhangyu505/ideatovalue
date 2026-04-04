@@ -57,39 +57,26 @@ export function DiscoverProjectsMenu({ active = false }: DiscoverProjectsMenuPro
         }`}
       >
         <div className="overflow-hidden rounded-[30px] border border-purple-100/80 bg-white/95 p-4 shadow-[0_30px_80px_rgba(76,29,149,0.14)] backdrop-blur-2xl dark:border-purple-900/40 dark:bg-slate-950/95">
-          <div className="grid grid-cols-[220px_minmax(0,1fr)_260px] gap-4">
-            <div className="rounded-[24px] bg-slate-50/90 p-3 dark:bg-slate-900/80">
-              <div className="px-3 pb-3 pt-2">
-                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
-                  一级分类
-                </div>
-                <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                  从项目类型切入，先找到你最关心的方向。
-                </div>
-              </div>
-              <div className="space-y-1">
+          <div className="grid grid-cols-[minmax(0,1fr)_260px] gap-4">
+            <div className="rounded-[24px] bg-gradient-to-br from-white via-purple-50/70 to-blue-50/70 p-5 dark:from-slate-900 dark:via-purple-950/20 dark:to-blue-950/20">
+              <div className="mb-5 flex flex-wrap gap-2">
                 {discoveryCategories.map((category) => (
                   <Link
                     key={category.slug}
                     href={buildDiscoveryHref({ primary: category.slug })}
-                    className={`block rounded-2xl px-4 py-3 transition-all ${
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
                       activeCategory.slug === category.slug
-                        ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950 dark:text-slate-100'
-                        : 'text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-950/60 dark:hover:text-slate-100'
+                        ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/20'
+                        : 'border border-purple-100/80 bg-white/90 text-slate-700 hover:border-purple-200 hover:text-purple-700 dark:border-slate-800 dark:bg-slate-950/75 dark:text-slate-200 dark:hover:border-purple-800 dark:hover:text-purple-300'
                     }`}
                     onMouseEnter={() => setActiveCategorySlug(category.slug)}
                     onFocus={() => setActiveCategorySlug(category.slug)}
                   >
-                    <div className="font-medium">{category.label}</div>
-                    <div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                      {category.description}
-                    </div>
+                    {category.label}
                   </Link>
                 ))}
               </div>
-            </div>
 
-            <div className="rounded-[24px] bg-gradient-to-br from-white via-purple-50/70 to-blue-50/70 p-5 dark:from-slate-900 dark:via-purple-950/20 dark:to-blue-950/20">
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
@@ -98,9 +85,6 @@ export function DiscoverProjectsMenu({ active = false }: DiscoverProjectsMenuPro
                   <h3 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
                     {activeCategory.label}
                   </h3>
-                  <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-400">
-                    {activeCategory.description}
-                  </p>
                 </div>
                 <Link
                   href={buildDiscoveryHref({ primary: activeCategory.slug })}
