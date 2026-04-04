@@ -96,9 +96,37 @@ const requiredFieldLabels: Array<[keyof typeof initialFormData, string]> = [
   ['contactEmail', '联系邮箱'],
 ];
 
+const requiredFieldStepMap: Record<keyof typeof initialFormData, number> = {
+  projectName: 1,
+  projectType: 1,
+  projectSubcategory: 1,
+  description: 1,
+  goal: 2,
+  problem: 2,
+  audience: 2,
+  solution: 2,
+  verification: 2,
+  existingResources: 3,
+  neededResources: 3,
+  keyRisks: 3,
+  riskResponses: 3,
+  timeline: 4,
+  publicStage: 4,
+  badgeLabel: 4,
+  completionRate: 4,
+  supporterCount: 4,
+  daysLeft: 4,
+  supportTiers: 4,
+  latestUpdates: 4,
+  contactName: 5,
+  contactEmail: 5,
+  contactPhone: 5,
+};
+
 export default function StartProjectPage() {
   const { user } = useAuthUser();
   const [currentStep, setCurrentStep] = useState(1);
+  const [pendingFocusField, setPendingFocusField] = useState<keyof typeof initialFormData | ''>('');
   const totalSteps = 6;
 
   // 表单数据状态
@@ -127,6 +155,23 @@ export default function StartProjectPage() {
       contactEmail: current.contactEmail || user.email || '',
     }));
   }, [user]);
+
+  useEffect(() => {
+    if (!pendingFocusField) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const target = document.getElementById(pendingFocusField);
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target?.focus();
+      setPendingFocusField('');
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [currentStep, pendingFocusField]);
 
   const steps = [
     { id: 1, title: '基本信息', icon: FileText },
@@ -160,24 +205,33 @@ export default function StartProjectPage() {
 
     const missingFields = requiredFieldLabels
       .filter(([field]) => !formData[field].trim())
-      .map(([, label]) => label);
+      .map(([field, label]) => ({ field, label }));
 
     if (missingFields.length > 0) {
-      setSubmitError(`还有未填写的必填项：${missingFields.join('、')}。`);
+      const firstMissingField = missingFields[0];
+      setCurrentStep(requiredFieldStepMap[firstMissingField.field]);
+      setPendingFocusField(firstMissingField.field);
+      setSubmitError(`还有未填写的必填项：${missingFields.map((item) => item.label).join('、')}。`);
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.contactEmail.trim())) {
+      setCurrentStep(requiredFieldStepMap.contactEmail);
+      setPendingFocusField('contactEmail');
       setSubmitError('请填写正确的联系邮箱。');
       return;
     }
 
     if (Number.parseInt(formData.completionRate || '0', 10) < 0 || Number.parseInt(formData.completionRate || '0', 10) > 100) {
+      setCurrentStep(requiredFieldStepMap.completionRate);
+      setPendingFocusField('completionRate');
       setSubmitError('当前进度需要填写 0 到 100 之间的整数。');
       return;
     }
 
     if (Number.parseInt(formData.supporterCount || '0', 10) < 0 || Number.parseInt(formData.daysLeft || '0', 10) < 0) {
+      setCurrentStep(requiredFieldStepMap.supporterCount);
+      setPendingFocusField('supporterCount');
       setSubmitError('预估支持人数和剩余时间不能为负数。');
       return;
     }
@@ -365,7 +419,7 @@ export default function StartProjectPage() {
                         })
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger id="projectType">
                         <SelectValue placeholder="请选择项目类型" />
                       </SelectTrigger>
                       <SelectContent>
@@ -385,7 +439,7 @@ export default function StartProjectPage() {
                       onValueChange={(value) => setFormData({...formData, projectSubcategory: value})}
                       disabled={!formData.projectType}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger id="projectSubcategory">
                         <SelectValue placeholder={formData.projectType ? '请选择二级分类' : '请先选择项目类型'} />
                       </SelectTrigger>
                       <SelectContent>
@@ -559,7 +613,7 @@ export default function StartProjectPage() {
                         value={formData.publicStage}
                         onValueChange={(value) => setFormData({...formData, publicStage: value})}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger id="publicStage">
                           <SelectValue placeholder="请选择公开展示阶段" />
                         </SelectTrigger>
                         <SelectContent>
@@ -578,7 +632,7 @@ export default function StartProjectPage() {
                         value={formData.badgeLabel}
                         onValueChange={(value) => setFormData({...formData, badgeLabel: value})}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger id="badgeLabel">
                           <SelectValue placeholder="请选择推荐标签" />
                         </SelectTrigger>
                         <SelectContent>

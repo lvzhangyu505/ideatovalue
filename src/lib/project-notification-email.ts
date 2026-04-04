@@ -95,13 +95,36 @@ export function isProjectMailConfigured() {
   return Boolean(smtpHost && smtpUser && smtpPass && mailFrom);
 }
 
+function getMissingMailConfigLabels() {
+  const { smtpHost, smtpUser, smtpPass, mailFrom } = getMailConfig();
+  const missingLabels: string[] = [];
+
+  if (!smtpHost) {
+    missingLabels.push('SMTP_HOST');
+  }
+
+  if (!smtpUser) {
+    missingLabels.push('SMTP_USER');
+  }
+
+  if (!smtpPass) {
+    missingLabels.push('SMTP_PASS');
+  }
+
+  if (!mailFrom) {
+    missingLabels.push('SMTP_FROM');
+  }
+
+  return missingLabels;
+}
+
 export async function sendProjectNotificationMail({ to, subject, text, html, replyTo }: SendMailInput) {
   const { smtpHost, smtpPort, smtpUser, smtpPass, mailFrom } = getMailConfig();
 
   if (!smtpHost || !smtpUser || !smtpPass || !mailFrom) {
     return {
       sent: false,
-      message: 'SMTP 未配置完整，暂未发送邮件。',
+      message: `SMTP 未配置完整，暂未发送邮件。缺少：${getMissingMailConfigLabels().join('、')}`,
     } satisfies ProjectMailResult;
   }
 

@@ -150,7 +150,10 @@ export async function POST(request: Request) {
 
     if (insertError) {
       console.error('项目申请入库失败:', insertError);
-      return NextResponse.json({ message: '项目已填写完成，但保存申请记录失败，请稍后重试。' }, { status: 500 });
+      return NextResponse.json(
+        { message: `项目已填写完成，但保存申请记录失败：${insertError.message}` },
+        { status: 500 }
+      );
     }
 
     try {

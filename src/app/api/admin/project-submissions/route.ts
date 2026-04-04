@@ -57,7 +57,7 @@ export async function GET(request: Request) {
       .from('project_submissions')
       .select('*')
       .in('status', [...SUBMISSION_STATUS_VALUES])
-      .order('created_at', { ascending: false });
+      .order('updated_at', { ascending: false });
 
     if (error) {
       throw error;

@@ -147,7 +147,10 @@ export async function PATCH(request: Request) {
       .eq('id', data.submissionId);
 
     if (error) {
-      throw error;
+      return NextResponse.json(
+        { message: `更新项目公开信息失败：${error.message}` },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ success: true, message: '公开信息已更新。' });

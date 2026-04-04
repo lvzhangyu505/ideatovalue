@@ -87,6 +87,14 @@ export default function AdminPage() {
     void loadSubmissions();
   }, [isAdmin, user]);
 
+  useEffect(() => {
+    if (!user || !isAdmin || typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem('ideatovalue.admin-notifications-read-at', String(Date.now()));
+  }, [isAdmin, user, submissions.length]);
+
   async function handleReview(submissionId: string, status: 'approved' | 'rejected') {
     try {
       setSubmittingId(submissionId);
@@ -335,6 +343,9 @@ export default function AdminPage() {
                             <span>展示阶段：{getDiscoveryStageLabel(submission.public_stage)}</span>
                             <span>推荐标签：{submission.badge_label || '平台审核通过'}</span>
                             <span>进度：{submission.completion_rate}%</span>
+                            {submission.updated_at !== submission.created_at ? (
+                              <span className="text-purple-600 dark:text-purple-300">发起人最近补充过公开信息</span>
+                            ) : null}
                           </div>
                         </div>
                         <div className="text-sm text-slate-500 dark:text-slate-400">
