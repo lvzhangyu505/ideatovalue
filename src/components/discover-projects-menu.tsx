@@ -52,7 +52,7 @@ export function DiscoverProjectsMenu({ active = false }: DiscoverProjectsMenuPro
       </button>
 
       <div
-        className={`absolute left-1/2 top-full z-50 mt-5 w-[940px] -translate-x-1/2 transition-all duration-200 ${
+        className={`absolute left-1/2 top-full z-50 w-[940px] max-w-[calc(100vw-3rem)] -translate-x-[42%] pt-4 transition-all duration-200 ${
           isOpen ? 'pointer-events-auto translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
         }`}
       >
