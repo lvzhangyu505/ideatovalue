@@ -38,7 +38,7 @@ export default function RulesPage() {
             {/* 中间导航 - 居中分散 */}
             <nav className="hidden md:flex items-center gap-10 lg:gap-16 flex-1 justify-center">
               <Link href="/projects" className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400 transition-all">
-                浏览项目
+                发现项目
               </Link>
               <Link href="/start" className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400 transition-all">
                 发起项目

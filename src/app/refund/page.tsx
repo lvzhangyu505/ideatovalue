@@ -29,7 +29,7 @@ export default function RefundPage() {
             
             <nav className="hidden md:flex items-center gap-6">
               <Link href="/projects" className="text-sm font-medium hover:text-primary transition-colors">
-                浏览项目
+                发现项目
               </Link>
               <Link href="/start" className="text-sm font-medium hover:text-primary transition-colors">
                 发起项目

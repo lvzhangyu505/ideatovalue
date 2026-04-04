@@ -1,420 +1,391 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { ArrowRight, Clock, Search, SlidersHorizontal, Sparkles, Users } from 'lucide-react';
+
 import { AuthActions } from '@/components/auth-actions';
+import { DiscoverProjectsMenu } from '@/components/discover-projects-menu';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
-import { 
-  Users, 
-  Clock, 
-  Search, 
-  Filter,
-  ArrowRight,
-  Rocket
-} from 'lucide-react';
+import {
+  buildDiscoveryHref,
+  discoveryCategories,
+  discoveryProjects,
+  discoveryProjectStages,
+  discoveryRecommendedViews,
+  getDiscoveryCategory,
+  getDiscoveryStageLabel,
+  getSecondaryCategoryLabel,
+} from '@/lib/project-discovery';
 
-// 模拟项目数据
-const allProjects = [
-  {
-    id: 1,
-    title: '智慧农业物联网系统',
-    description: '为小型农场提供低成本的智能监控与自动化控制方案',
-    category: '产品型',
-    phase: '原型阶段',
-    status: '执行中',
-    progress: 78,
-    supporters: 156,
-    daysLeft: 12,
-    targetAmount: 50000,
-    currentAmount: 39000,
-    creator: '张明',
-  },
-  {
-    id: 2,
-    title: '社区青少年编程教育计划',
-    description: '通过有趣的项目式学习，培养青少年编程思维',
-    category: '内容型',
-    phase: '小规模交付阶段',
-    status: '执行中',
-    progress: 92,
-    supporters: 234,
-    daysLeft: 5,
-    targetAmount: 30000,
-    currentAmount: 27600,
-    creator: '李华',
-  },
-  {
-    id: 3,
-    title: '环保材料研发实验室',
-    description: '开发可降解包装材料，减少塑料污染',
-    category: '产品型',
-    phase: '验证阶段',
-    status: '执行中',
-    progress: 45,
-    supporters: 89,
-    daysLeft: 25,
-    targetAmount: 80000,
-    currentAmount: 36000,
-    creator: '王芳',
-  },
-  {
-    id: 4,
-    title: '远程办公协作工具',
-    description: '专为分布式团队设计的轻量级协作平台',
-    category: '产品型',
-    phase: '灵感阶段',
-    status: '审核中',
-    progress: 0,
-    supporters: 0,
-    daysLeft: 0,
-    targetAmount: 0,
-    currentAmount: 0,
-    creator: '赵强',
-  },
-  {
-    id: 5,
-    title: '乡村文化纪录片',
-    description: '记录即将消失的乡村传统与文化',
-    category: '内容型',
-    phase: '灵感阶段',
-    status: '审核中',
-    progress: 0,
-    supporters: 0,
-    daysLeft: 0,
-    targetAmount: 0,
-    currentAmount: 0,
-    creator: '刘洋',
-  },
-  {
-    id: 6,
-    title: 'AI 辅助写作助手',
-    description: '帮助创作者突破写作瓶颈的工具',
-    category: '服务型',
-    phase: '验证阶段',
-    status: '执行中',
-    progress: 67,
-    supporters: 123,
-    daysLeft: 15,
-    targetAmount: 40000,
-    currentAmount: 26800,
-    creator: '陈晨',
-  },
-  {
-    id: 7,
-    title: '社区共享厨房',
-    description: '为社区居民提供共享烹饪空间和厨具',
-    category: '活动型',
-    phase: '原型阶段',
-    status: '预警中',
-    progress: 45,
-    supporters: 67,
-    daysLeft: 8,
-    targetAmount: 25000,
-    currentAmount: 11250,
-    creator: '周婷',
-  },
-  {
-    id: 8,
-    title: '可持续时尚品牌',
-    description: '使用回收材料制作的时尚服装品牌',
-    category: '产品型',
-    phase: '小规模交付阶段',
-    status: '已结项',
-    progress: 100,
-    supporters: 312,
-    daysLeft: 0,
-    targetAmount: 100000,
-    currentAmount: 115000,
-    creator: '吴敏',
-  },
-];
-
-const statusColors: Record<string, string> = {
-  '审核中': 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100',
-  '已立项': 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-  '执行中': 'bg-green-100 text-green-800 hover:bg-green-100',
-  '预警中': 'bg-orange-100 text-orange-800 hover:bg-orange-100',
-  '已结项': 'bg-gray-100 text-gray-800 hover:bg-gray-100',
-  '已中止': 'bg-red-100 text-red-800 hover:bg-red-100',
+const stageStyles: Record<string, string> = {
+  applying: 'bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200',
+  reviewing: 'bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300',
+  supporting: 'bg-fuchsia-100 text-fuchsia-700 hover:bg-fuchsia-100 dark:bg-fuchsia-950/40 dark:text-fuchsia-300',
+  executing: 'bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300',
+  'reviewing-results': 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300',
+  completed: 'bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-950/40 dark:text-green-300',
 };
 
+const sortOptions = [
+  { value: 'newest', label: '最新上线' },
+  { value: 'popular', label: '支持热度' },
+  { value: 'deadline', label: '即将截止' },
+  { value: 'completion', label: '高完成度' },
+] as const;
+
 export default function ProjectsPage() {
+  const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedPhase, setSelectedPhase] = useState('all');
-  const [sortBy, setSortBy] = useState('latest');
+  const [selectedPrimary, setSelectedPrimary] = useState('all');
+  const [selectedSecondary, setSelectedSecondary] = useState('all');
+  const [selectedStage, setSelectedStage] = useState('all');
+  const [selectedView, setSelectedView] = useState('all');
+  const [sortBy, setSortBy] = useState<(typeof sortOptions)[number]['value']>('newest');
 
-  // 筛选逻辑
-  const filteredProjects = allProjects.filter(project => {
-    const matchesSearch = project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         project.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = selectedStatus === 'all' || project.status === selectedStatus;
-    const matchesCategory = selectedCategory === 'all' || project.category === selectedCategory;
-    const matchesPhase = selectedPhase === 'all' || project.phase === selectedPhase;
-    
-    return matchesSearch && matchesStatus && matchesCategory && matchesPhase;
-  });
+  useEffect(() => {
+    setSelectedPrimary(searchParams.get('primary') || 'all');
+    setSelectedSecondary(searchParams.get('secondary') || 'all');
+    setSelectedStage(searchParams.get('stage') || 'all');
+    setSelectedView(searchParams.get('view') || 'all');
 
-  // 排序逻辑
-  const sortedProjects = [...filteredProjects].sort((a, b) => {
-    switch (sortBy) {
-      case 'latest':
-        return b.id - a.id;
-      case 'popular':
-        return b.supporters - a.supporters;
-      case 'ending':
-        return a.daysLeft - b.daysLeft;
-      case 'progress':
-        return b.progress - a.progress;
-      default:
-        return 0;
+    const nextSort = searchParams.get('sort');
+    if (nextSort === 'popular' || nextSort === 'deadline' || nextSort === 'completion' || nextSort === 'newest') {
+      setSortBy(nextSort);
+    } else {
+      setSortBy('newest');
     }
-  });
+  }, [searchParams]);
+
+  const secondaryOptions = useMemo(() => {
+    if (selectedPrimary === 'all') {
+      return discoveryCategories.flatMap((category) =>
+        category.secondaryCategories.map((secondary) => ({
+          ...secondary,
+          primaryLabel: category.label,
+          primarySlug: category.slug,
+        }))
+      );
+    }
+
+    const currentCategory = getDiscoveryCategory(selectedPrimary);
+    return (
+      currentCategory?.secondaryCategories.map((secondary) => ({
+        ...secondary,
+        primaryLabel: currentCategory.label,
+        primarySlug: currentCategory.slug,
+      })) ?? []
+    );
+  }, [selectedPrimary]);
+
+  useEffect(() => {
+    if (selectedSecondary === 'all') {
+      return;
+    }
+
+    const currentSecondaryExists = secondaryOptions.some((secondary) => secondary.slug === selectedSecondary);
+
+    if (!currentSecondaryExists) {
+      setSelectedSecondary('all');
+    }
+  }, [secondaryOptions, selectedSecondary]);
+
+  const selectedViewMeta = discoveryRecommendedViews.find((view) => view.slug === selectedView);
+
+  const filteredProjects = useMemo(() => {
+    return discoveryProjects.filter((project) => {
+      const normalizedQuery = searchQuery.trim().toLowerCase();
+      const matchesSearch =
+        !normalizedQuery ||
+        project.title.toLowerCase().includes(normalizedQuery) ||
+        project.description.toLowerCase().includes(normalizedQuery) ||
+        project.creator.toLowerCase().includes(normalizedQuery);
+
+      const matchesPrimary = selectedPrimary === 'all' || project.primaryCategory === selectedPrimary;
+      const matchesSecondary = selectedSecondary === 'all' || project.secondaryCategory === selectedSecondary;
+      const matchesStage = selectedStage === 'all' || project.stage === selectedStage;
+      const matchesView = selectedView === 'all' || project.recommendations.includes(selectedView);
+
+      return matchesSearch && matchesPrimary && matchesSecondary && matchesStage && matchesView;
+    });
+  }, [searchQuery, selectedPrimary, selectedSecondary, selectedStage, selectedView]);
+
+  const sortedProjects = useMemo(() => {
+    return [...filteredProjects].sort((left, right) => {
+      switch (sortBy) {
+        case 'popular':
+          return right.supporters - left.supporters;
+        case 'deadline':
+          return left.daysLeft - right.daysLeft;
+        case 'completion':
+          return right.completionRate - left.completionRate;
+        case 'newest':
+        default:
+          return new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime();
+      }
+    });
+  }, [filteredProjects, sortBy]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/30 to-blue-50/20 dark:from-slate-950 dark:via-purple-950/20 dark:to-blue-950/10">
-      {/* 顶部导航栏 - 居中分散布局 */}
-      <header className="sticky top-0 z-50 border-b border-purple-100/50 dark:border-purple-900/30 bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl supports-[backdrop-filter]:bg-white/70">
+      <header className="sticky top-0 z-50 border-b border-purple-100/50 bg-white/70 backdrop-blur-xl supports-[backdrop-filter]:bg-white/70 dark:border-purple-900/30 dark:bg-slate-950/70">
         <div className="container mx-auto px-6 lg:px-12">
           <div className="flex h-20 items-center justify-between">
-            {/* 左侧品牌 */}
-            <Link href="/" className="flex items-center gap-3 group">
-              {/* 双液态圆Logo */}
-              <div className="relative w-10 h-10">
-                <div className="absolute inset-0 bg-gradient-to-br from-pink-400 via-purple-500 to-blue-500 rounded-full opacity-90 blur-[2px]"></div>
-                <div className="absolute inset-1 bg-gradient-to-br from-pink-300 via-purple-400 to-blue-400 rounded-full"></div>
-                <div className="absolute inset-2 bg-white/40 dark:bg-white/20 backdrop-blur-sm rounded-full"></div>
+            <Link href="/" className="group flex items-center gap-3">
+              <div className="relative h-10 w-10">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-400 via-purple-500 to-blue-500 opacity-90 blur-[2px]" />
+                <div className="absolute inset-1 rounded-full bg-gradient-to-br from-pink-300 via-purple-400 to-blue-400" />
+                <div className="absolute inset-2 rounded-full bg-white/40 backdrop-blur-sm dark:bg-white/20" />
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent group-hover:from-purple-500 group-hover:to-blue-500 transition-all">
+              <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-xl font-bold text-transparent transition-all group-hover:from-purple-500 group-hover:to-blue-500">
                 共创平台
               </span>
             </Link>
-            
-            {/* 中间导航 - 居中分散 */}
-            <nav className="hidden md:flex items-center gap-10 lg:gap-16 flex-1 justify-center">
-              <Link href="/projects" className="text-sm font-medium text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-all">
-                浏览项目
-              </Link>
-              <Link href="/start" className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400 transition-all">
+
+            <nav className="hidden flex-1 items-center justify-center gap-10 md:flex lg:gap-16">
+              <DiscoverProjectsMenu active />
+              <Link href="/start" className="text-sm font-medium text-slate-600 transition-all hover:text-purple-600 dark:text-slate-300 dark:hover:text-purple-400">
                 发起项目
               </Link>
-              <Link href="/about" className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400 transition-all">
+              <Link href="/about" className="text-sm font-medium text-slate-600 transition-all hover:text-purple-600 dark:text-slate-300 dark:hover:text-purple-400">
                 平台介绍
               </Link>
             </nav>
 
-            {/* 右侧操作区 */}
             <AuthActions />
           </div>
         </div>
       </header>
 
-      {/* 页面标题 */}
-      <section className="border-b border-purple-100/50 dark:border-purple-900/30 bg-gradient-to-br from-purple-50/50 via-transparent to-blue-50/50 dark:from-purple-950/20 dark:via-transparent dark:to-blue-950/20 py-12">
+      <section className="border-b border-purple-100/50 bg-gradient-to-br from-purple-50/50 via-transparent to-blue-50/50 py-12 dark:border-purple-900/30 dark:from-purple-950/20 dark:to-blue-950/20">
         <div className="container mx-auto px-6 lg:px-12">
-          <h1 className="text-3xl md:text-4xl font-bold mb-3 bg-gradient-to-r from-slate-800 via-purple-700 to-blue-700 dark:from-slate-100 dark:via-purple-300 dark:to-blue-300 bg-clip-text text-transparent">
-            浏览项目
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400">发现并支持优秀的共创项目，开启你的创意之旅</p>
-        </div>
-      </section>
-
-      {/* 筛选和搜索 */}
-      <section className="border-b border-purple-100/50 dark:border-purple-900/30 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm sticky top-20 z-40">
-        <div className="container mx-auto px-6 lg:px-12 py-5">
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* 搜索框 */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="搜索项目名称或描述..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border-purple-200/50 dark:border-purple-800/50 focus:ring-2 focus:ring-purple-400/50 transition-all rounded-full"
-              />
-            </div>
-
-            {/* 筛选条件 */}
-            <div className="flex flex-wrap gap-3">
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="w-[140px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border-purple-200/50 dark:border-purple-800/50">
-                  <SelectValue placeholder="项目状态" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部状态</SelectItem>
-                  <SelectItem value="审核中">审核中</SelectItem>
-                  <SelectItem value="已立项">已立项</SelectItem>
-                  <SelectItem value="执行中">执行中</SelectItem>
-                  <SelectItem value="预警中">预警中</SelectItem>
-                  <SelectItem value="已结项">已结项</SelectItem>
-                  <SelectItem value="已中止">已中止</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="项目类型" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部类型</SelectItem>
-                  <SelectItem value="内容型">内容型</SelectItem>
-                  <SelectItem value="活动型">活动型</SelectItem>
-                  <SelectItem value="产品型">产品型</SelectItem>
-                  <SelectItem value="服务型">服务型</SelectItem>
-                  <SelectItem value="社群实验型">社群实验型</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedPhase} onValueChange={setSelectedPhase}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="成熟度阶段" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部阶段</SelectItem>
-                  <SelectItem value="灵感阶段">灵感阶段</SelectItem>
-                  <SelectItem value="验证阶段">验证阶段</SelectItem>
-                  <SelectItem value="原型阶段">原型阶段</SelectItem>
-                  <SelectItem value="小规模交付阶段">小规模交付阶段</SelectItem>
-                  <SelectItem value="可复制阶段">可复制阶段</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="排序方式" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="latest">最新发布</SelectItem>
-                  <SelectItem value="popular">热门支持</SelectItem>
-                  <SelectItem value="ending">即将截止</SelectItem>
-                  <SelectItem value="progress">进度最高</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 项目列表 */}
-      <section className="py-8">
-        <div className="container">
-          {/* 结果统计 */}
-          <div className="mb-6 flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              找到 <span className="font-semibold text-foreground">{sortedProjects.length}</span> 个项目
+          <div className="max-w-4xl">
+            <Badge className="mb-4 bg-white/80 text-purple-700 shadow-sm hover:bg-white dark:bg-slate-900/80 dark:text-purple-300">
+              Kickstarter 风格发现导航
+            </Badge>
+            <h1 className="bg-gradient-to-r from-slate-800 via-purple-700 to-blue-700 bg-clip-text text-3xl font-bold text-transparent dark:from-slate-100 dark:via-purple-300 dark:to-blue-300 md:text-5xl">
+              发现项目
+            </h1>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600 dark:text-slate-400 md:text-lg">
+              从一级分类进入，再缩小到二级方向、项目阶段和推荐入口，快速发现你真正想支持的项目。
             </p>
           </div>
 
-          {/* 项目卡片网格 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {sortedProjects.map((project) => (
-              <Card key={project.id} className="group overflow-hidden bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border-purple-100/50 dark:border-purple-900/30 hover:shadow-2xl hover:shadow-purple-500/10 transition-all duration-300 hover:scale-[1.02] flex flex-col rounded-2xl">
-                <div className="aspect-video bg-gradient-to-br from-purple-100/50 via-pink-100/50 to-blue-100/50 dark:from-purple-900/30 dark:via-pink-900/30 dark:to-blue-900/30 flex items-center justify-center group-hover:from-purple-200/50 group-hover:via-pink-200/50 group-hover:to-blue-200/50 dark:group-hover:from-purple-800/40 dark:group-hover:via-pink-800/40 dark:group-hover:to-blue-800/40 transition-all duration-500">
-                  <div className="text-4xl">🎯</div>
-                </div>
-                <CardHeader className="flex-1 pb-3">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <Badge 
-                      variant="secondary" 
-                      className={statusColors[project.status]}
-                    >
-                      {project.status}
-                    </Badge>
-                    <Badge variant="outline" className="border-purple-200/50 dark:border-purple-800/50 text-slate-600 dark:text-slate-400">
-                      {project.category}
-                    </Badge>
-                  </div>
-                  <CardTitle className="line-clamp-2 mb-2 text-lg group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                    {project.title}
-                  </CardTitle>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 mb-2">{project.description}</p>
-                  <div className="text-xs text-slate-500 dark:text-slate-500">
-                    发起人：{project.creator}
-                  </div>
-                </CardHeader>
-                <CardContent className="pb-3">
-                  <div className="space-y-3">
-                    {project.status === '执行中' || project.status === '预警中' ? (
-                      <>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-slate-500 dark:text-slate-500">项目进度</span>
-                          <span className="font-semibold text-slate-700 dark:text-slate-300">{project.progress}%</span>
-                        </div>
-                        <Progress value={project.progress} className="h-2" />
-                        <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-500">
-                          <div className="flex items-center gap-1.5">
-                            <Users className="h-4 w-4" />
-                            <span>{project.supporters} 人支持</span>
-                          </div>
-                          {project.daysLeft > 0 && (
-                            <div className="flex items-center gap-1.5">
-                              <Clock className="h-4 w-4" />
-                              <span>{project.daysLeft} 天剩余</span>
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-sm text-slate-600 dark:text-slate-400">
-                        {project.phase}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Link href={`/projects/${project.id}`} className="w-full">
-                    <Button 
-                      variant={project.status === '执行中' ? 'default' : 'outline'} 
-                      className={`w-full ${project.status === '执行中' 
-                        ? 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white rounded-xl shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-105 border-0' 
-                        : 'bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border-purple-200/50 dark:border-purple-800/50 text-slate-700 dark:text-slate-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600 dark:hover:text-purple-400 rounded-xl hover:scale-105'
-                      } transition-all`}
-                    >
-                      查看详情
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </Link>
-                </CardFooter>
-              </Card>
+          <div className="mt-8 flex flex-wrap gap-3">
+            {discoveryRecommendedViews.map((view) => (
+              <Link key={view.slug} href={buildDiscoveryHref({ view: view.slug })}>
+                <Badge
+                  variant={selectedView === view.slug ? 'default' : 'outline'}
+                  className={selectedView === view.slug ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white' : ''}
+                >
+                  {view.label}
+                </Badge>
+              </Link>
             ))}
           </div>
+        </div>
+      </section>
 
-          {/* 空状态 */}
-          {sortedProjects.length === 0 && (
-            <div className="text-center py-20">
-              <div className="w-20 h-20 bg-gradient-to-br from-purple-100/50 to-blue-100/50 dark:from-purple-900/30 dark:to-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-6 backdrop-blur-sm">
-                <span className="text-5xl">🔍</span>
+      <section className="sticky top-20 z-40 border-b border-purple-100/50 bg-white/65 py-5 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-950/65">
+        <div className="container mx-auto px-6 lg:px-12">
+          <div className="flex flex-col gap-4">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                placeholder="搜索项目名称、简介或发起人..."
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="h-12 rounded-full border-purple-200/60 bg-white/85 pl-11 pr-4 dark:border-purple-800/50 dark:bg-slate-900/75"
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Select value={selectedPrimary} onValueChange={setSelectedPrimary}>
+                <SelectTrigger className="w-[160px] rounded-full bg-white/85 dark:bg-slate-900/75">
+                  <SelectValue placeholder="一级分类" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部一级分类</SelectItem>
+                  {discoveryCategories.map((category) => (
+                    <SelectItem key={category.slug} value={category.slug}>
+                      {category.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={selectedSecondary} onValueChange={setSelectedSecondary}>
+                <SelectTrigger className="w-[180px] rounded-full bg-white/85 dark:bg-slate-900/75">
+                  <SelectValue placeholder="二级分类" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部二级分类</SelectItem>
+                  {secondaryOptions.map((secondary) => (
+                    <SelectItem key={`${secondary.primarySlug}-${secondary.slug}`} value={secondary.slug}>
+                      {selectedPrimary === 'all'
+                        ? `${secondary.primaryLabel} · ${secondary.label}`
+                        : secondary.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={selectedStage} onValueChange={setSelectedStage}>
+                <SelectTrigger className="w-[160px] rounded-full bg-white/85 dark:bg-slate-900/75">
+                  <SelectValue placeholder="项目阶段" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部阶段</SelectItem>
+                  {discoveryProjectStages.map((stage) => (
+                    <SelectItem key={stage.slug} value={stage.slug}>
+                      {stage.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={sortBy} onValueChange={(value) => setSortBy(value as (typeof sortOptions)[number]['value'])}>
+                <SelectTrigger className="w-[160px] rounded-full bg-white/85 dark:bg-slate-900/75">
+                  <SelectValue placeholder="排序方式" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sortOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-8">
+        <div className="container mx-auto px-6 lg:px-12">
+          <div className="mb-6 flex flex-col gap-4 rounded-3xl border border-purple-100/60 bg-white/70 p-5 shadow-lg shadow-purple-500/5 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/65 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400">
+                <SlidersHorizontal className="h-4 w-4 text-purple-500" />
+                当前共找到 <span className="text-slate-900 dark:text-slate-100">{sortedProjects.length}</span> 个项目
               </div>
-              <h3 className="text-xl font-bold mb-2 bg-gradient-to-r from-slate-800 to-slate-600 dark:from-slate-200 dark:to-slate-400 bg-clip-text text-transparent">
-                没有找到匹配的项目
-              </h3>
-              <p className="text-slate-600 dark:text-slate-400 mb-6">
-                尝试调整筛选条件或搜索关键词
+              {selectedViewMeta ? (
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  当前入口：<span className="font-medium text-slate-900 dark:text-slate-100">{selectedViewMeta.label}</span>
+                  ，{selectedViewMeta.description}
+                </p>
+              ) : (
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  你可以通过分类、阶段和排序，自由切换到适合自己的发现视角。
+                </p>
+              )}
+            </div>
+
+            {(selectedView !== 'all' || selectedPrimary !== 'all' || selectedSecondary !== 'all' || selectedStage !== 'all' || searchQuery) ? (
+              <Link href="/projects">
+                <Button variant="outline" className="rounded-full">
+                  清空筛选
+                </Button>
+              </Link>
+            ) : null}
+          </div>
+
+          {sortedProjects.length === 0 ? (
+            <div className="rounded-[32px] border border-dashed border-purple-200/70 bg-white/70 px-6 py-16 text-center shadow-lg shadow-purple-500/5 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/60">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-purple-500/10 to-blue-500/10 text-3xl">
+                🔎
+              </div>
+              <h3 className="mt-6 text-2xl font-semibold text-slate-900 dark:text-slate-100">当前筛选下还没有匹配项目</h3>
+              <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400">
+                试着切换一级分类、放宽二级分类，或者回到“本周推荐”和“刚上线”入口继续发现。
               </p>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setSearchQuery('');
-                  setSelectedStatus('all');
-                  setSelectedCategory('all');
-                  setSelectedPhase('all');
-                }}
-                className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border-purple-200/50 dark:border-purple-800/50 text-slate-700 dark:text-slate-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600 dark:hover:text-purple-400 rounded-full"
-              >
-                清除筛选条件
-              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {sortedProjects.map((project) => {
+                const primaryCategory = getDiscoveryCategory(project.primaryCategory);
+                const secondaryLabel = getSecondaryCategoryLabel(project.primaryCategory, project.secondaryCategory);
+
+                return (
+                  <Card
+                    key={project.id}
+                    className="group flex h-full flex-col overflow-hidden rounded-[28px] border border-purple-100/60 bg-white/75 shadow-xl shadow-purple-500/6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-purple-500/12 dark:border-purple-900/30 dark:bg-slate-900/70"
+                  >
+                    <div className="flex aspect-[16/9] items-center justify-center bg-gradient-to-br from-purple-100/70 via-pink-100/60 to-blue-100/70 text-6xl dark:from-purple-900/30 dark:via-pink-900/20 dark:to-blue-900/30">
+                      {project.emoji}
+                    </div>
+                    <CardHeader className="pb-3">
+                      <div className="mb-3 flex flex-wrap items-center gap-2">
+                        <Badge className={stageStyles[project.stage] ?? stageStyles.applying}>
+                          {getDiscoveryStageLabel(project.stage)}
+                        </Badge>
+                        <Badge variant="outline">{primaryCategory?.label}</Badge>
+                        <Badge variant="outline">{secondaryLabel}</Badge>
+                      </div>
+                      <CardTitle className="line-clamp-2 text-xl transition-colors group-hover:text-purple-600 dark:group-hover:text-purple-400">
+                        {project.title}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-1 space-y-4">
+                      <p className="line-clamp-3 text-sm leading-7 text-slate-600 dark:text-slate-400">
+                        {project.description}
+                      </p>
+
+                      <div className="flex flex-wrap gap-2">
+                        {project.recommendations.slice(0, 2).map((recommendation) => {
+                          const recommendationLabel = discoveryRecommendedViews.find((view) => view.slug === recommendation)?.label;
+                          return recommendationLabel ? (
+                            <Badge key={recommendation} variant="secondary" className="bg-purple-100/80 text-purple-700 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300">
+                              <Sparkles className="mr-1 h-3 w-3" />
+                              {recommendationLabel}
+                            </Badge>
+                          ) : null;
+                        })}
+                      </div>
+
+                      <div className="space-y-3 rounded-2xl bg-slate-50/80 p-4 dark:bg-slate-950/60">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-500 dark:text-slate-400">完成度</span>
+                          <span className="font-semibold text-slate-900 dark:text-slate-100">{project.completionRate}%</span>
+                        </div>
+                        <Progress value={project.completionRate} className="h-2" />
+                        <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
+                          <div className="flex items-center gap-1.5">
+                            <Users className="h-4 w-4" />
+                            <span>{project.supporters} 人关注</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-4 w-4" />
+                            <span>{project.daysLeft > 0 ? `${project.daysLeft} 天剩余` : '已进入结果阶段'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-sm text-slate-500 dark:text-slate-400">发起人：{project.creator}</div>
+                    </CardContent>
+                    <CardFooter>
+                      <Link href={`/projects/${project.id}`} className="w-full">
+                        <Button className="w-full rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600">
+                          查看项目详情
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                      </Link>
+                    </CardFooter>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>

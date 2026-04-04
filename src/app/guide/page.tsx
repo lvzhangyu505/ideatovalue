@@ -79,7 +79,7 @@ export default function GuidePage() {
 
             <nav className="hidden flex-1 items-center justify-center gap-10 md:flex lg:gap-16">
               <Link href="/projects" className="text-sm font-medium text-slate-600 transition-all hover:text-purple-600 dark:text-slate-300 dark:hover:text-purple-400">
-                浏览项目
+                发现项目
               </Link>
               <Link href="/start" className="text-sm font-medium text-slate-600 transition-all hover:text-purple-600 dark:text-slate-300 dark:hover:text-purple-400">
                 发起项目

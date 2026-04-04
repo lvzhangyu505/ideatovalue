@@ -1,9 +1,17 @@
 import Link from "next/link";
 import { AuthActions } from "@/components/auth-actions";
+import { DiscoverProjectsMenu } from "@/components/discover-projects-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import {
+    buildDiscoveryHref,
+    discoveryCategories,
+    discoveryProjects,
+    getDiscoveryStageLabel,
+    getSecondaryCategoryLabel,
+} from "@/lib/project-discovery";
 
 import {
     Users,
@@ -17,72 +25,28 @@ import {
     Search,
 } from "lucide-react";
 
-const featuredProjects = [{
-    id: 1,
-    title: "智慧农业物联网系统",
-    description: "为小型农场提供低成本的智能监控与自动化控制方案",
-    category: "产品型",
-    phase: "原型阶段",
-    progress: 78,
-    supporters: 156,
-    daysLeft: 12,
-    image: "/api/placeholder/400/300",
-    targetAmount: 50000,
-    currentAmount: 39000
-}, {
-    id: 2,
-    title: "社区青少年编程教育计划",
-    description: "通过有趣的项目式学习，培养青少年编程思维",
-    category: "内容型",
-    phase: "小规模交付阶段",
-    progress: 92,
-    supporters: 234,
-    daysLeft: 5,
-    image: "/api/placeholder/400/300",
-    targetAmount: 30000,
-    currentAmount: 27600
-}, {
-    id: 3,
-    title: "环保材料研发实验室",
-    description: "开发可降解包装材料，减少塑料污染",
-    category: "产品型",
-    phase: "验证阶段",
-    progress: 45,
-    supporters: 89,
-    daysLeft: 25,
-    image: "/api/placeholder/400/300",
-    targetAmount: 80000,
-    currentAmount: 36000
-}];
+const featuredProjects = discoveryProjects.filter((project) =>
+    ["weekly", "observer", "completion"].some((tag) => project.recommendations.includes(tag))
+).slice(0, 3);
 
-const latestProjects = [{
-    id: 4,
-    title: "远程办公协作工具",
-    description: "专为分布式团队设计的轻量级协作平台",
-    category: "产品型",
-    phase: "灵感阶段",
-    progress: 23,
-    supporters: 45,
-    daysLeft: 30
-}, {
-    id: 5,
-    title: "乡村文化纪录片",
-    description: "记录即将消失的乡村传统与文化",
-    category: "内容型",
-    phase: "灵感阶段",
-    progress: 15,
-    supporters: 32,
-    daysLeft: 28
-}, {
-    id: 6,
-    title: "AI 辅助写作助手",
-    description: "帮助创作者突破写作瓶颈的工具",
-    category: "服务型",
-    phase: "验证阶段",
-    progress: 67,
-    supporters: 123,
-    daysLeft: 15
-}];
+const latestProjects = [...discoveryProjects]
+    .sort((left, right) => new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime())
+    .slice(0, 3);
+
+const discoveryTypeCards = discoveryCategories.map((category) => ({
+    ...category,
+    count: discoveryProjects.filter((project) => project.primaryCategory === category.slug).length,
+    highlights: category.secondaryCategories.slice(0, 3),
+}));
+
+const categoryEmojis: Record<string, string> = {
+    content: "📚",
+    product: "🧩",
+    service: "🧭",
+    community: "👥",
+    "public-good": "🌱",
+    event: "🎪",
+};
 
 export default function Home() {
     return (
@@ -106,9 +70,7 @@ export default function Home() {
                         
                         {/* 中间导航 - 居中分散 */}
                         <nav className="hidden md:flex items-center gap-10 lg:gap-16 flex-1 justify-center">
-                            <Link href="/projects" className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400 transition-all hover:scale-105">
-                                浏览项目
-                            </Link>
+                            <DiscoverProjectsMenu />
                             <Link href="/start" className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400 transition-all hover:scale-105">
                                 发起项目
                             </Link>
@@ -189,7 +151,7 @@ export default function Home() {
                                     className="w-full sm:w-auto px-10 py-7 text-lg bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border-purple-200/50 dark:border-purple-800/50 text-slate-700 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-slate-800/80 hover:text-purple-600 dark:hover:text-purple-400 hover:border-purple-300 dark:hover:border-purple-700 rounded-full transition-all hover:scale-105 shadow-lg shadow-purple-500/10"
                                 >
                                     <Users className="h-5 w-5 mr-2" />
-                                    浏览共创项目
+                                    发现共创项目
                                 </Button>
                             </Link>
                         </div>
@@ -247,6 +209,69 @@ export default function Home() {
                 </div>
             </section>
 
+            <section className="py-16">
+                <div className="container mx-auto px-6 lg:px-12">
+                    <div className="flex items-end justify-between gap-6 mb-10">
+                        <div>
+                            <h2 className="text-3xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-slate-800 to-slate-600 dark:from-slate-100 dark:to-slate-400 bg-clip-text text-transparent">
+                                按项目类型发现
+                            </h2>
+                            <p className="text-slate-600 dark:text-slate-400">
+                                先从方向切入，再深入到细分类和推荐入口，像 Kickstarter 一样更快找到你愿意支持的项目。
+                            </p>
+                        </div>
+                        <Link href="/projects">
+                            <Button variant="ghost" className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20">
+                                进入发现项目页
+                                <ArrowRight className="h-4 w-4 ml-2" />
+                            </Button>
+                        </Link>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {discoveryTypeCards.map((category) => (
+                            <Link key={category.slug} href={buildDiscoveryHref({ primary: category.slug })}>
+                                <Card className="group h-full overflow-hidden rounded-3xl border border-purple-100/60 bg-white/70 shadow-xl shadow-purple-500/8 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-purple-500/12 dark:border-purple-900/30 dark:bg-slate-900/70">
+                                    <CardHeader className="pb-4">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex items-center gap-4">
+                                                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500/15 via-pink-500/10 to-blue-500/15 text-3xl">
+                                                    {categoryEmojis[category.slug]}
+                                                </div>
+                                                <div>
+                                                    <CardTitle className="text-xl group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                                                        {category.label}
+                                                    </CardTitle>
+                                                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                                        当前 {category.count} 个项目
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <ArrowRight className="h-5 w-5 text-slate-400 transition-transform group-hover:translate-x-1 group-hover:text-purple-500" />
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
+                                            {category.description}
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {category.highlights.map((secondary) => (
+                                                <span
+                                                    key={secondary.slug}
+                                                    className="rounded-full border border-purple-200/70 bg-purple-50/70 px-3 py-1 text-xs font-medium text-purple-700 dark:border-purple-800/60 dark:bg-purple-950/30 dark:text-purple-300"
+                                                >
+                                                    {secondary.label}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
             {/* 精选项目区 */}
             <section className="py-16">
                 <div className="container mx-auto px-6 lg:px-12">
@@ -257,7 +282,7 @@ export default function Home() {
                             </h2>
                             <p className="text-slate-600 dark:text-slate-400">逻辑完整、执行可靠的优质共创项目</p>
                         </div>
-                        <Link href="/projects?filter=featured">
+                        <Link href={buildDiscoveryHref({ view: "weekly" })}>
                             <Button variant="ghost" className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20">
                                 查看全部
                                 <ArrowRight className="h-4 w-4 ml-2" />
@@ -274,10 +299,10 @@ export default function Home() {
                                 <CardHeader className="pb-3">
                                     <div className="flex items-start justify-between gap-2 mb-2">
                                         <Badge variant="secondary" className="bg-purple-100/80 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30">
-                                            {project.category}
+                                            {discoveryCategories.find((category) => category.slug === project.primaryCategory)?.label}
                                         </Badge>
                                         <Badge variant="outline" className="border-purple-200/50 dark:border-purple-800/50 text-slate-600 dark:text-slate-400">
-                                            {project.phase}
+                                            {getSecondaryCategoryLabel(project.primaryCategory, project.secondaryCategory)}
                                         </Badge>
                                     </div>
                                     <CardTitle className="line-clamp-2 text-lg group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
@@ -291,9 +316,9 @@ export default function Home() {
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between text-sm">
                                             <span className="text-slate-500 dark:text-slate-500">项目进度</span>
-                                            <span className="font-semibold text-slate-700 dark:text-slate-300">{project.progress}%</span>
+                                            <span className="font-semibold text-slate-700 dark:text-slate-300">{project.completionRate}%</span>
                                         </div>
-                                        <Progress value={project.progress} className="h-2" />
+                                        <Progress value={project.completionRate} className="h-2" />
                                         <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-500">
                                             <div className="flex items-center gap-1.5">
                                                 <Users className="h-4 w-4" />
@@ -303,6 +328,9 @@ export default function Home() {
                                                 <Clock className="h-4 w-4" />
                                                 <span>{project.daysLeft} 天剩余</span>
                                             </div>
+                                        </div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                                            当前阶段：{getDiscoveryStageLabel(project.stage)}
                                         </div>
                                     </div>
                                 </CardContent>
@@ -329,7 +357,7 @@ export default function Home() {
                             </h2>
                             <p className="text-slate-600 dark:text-slate-400">刚刚上线，等待你的支持</p>
                         </div>
-                        <Link href="/projects?sort=latest">
+                        <Link href={buildDiscoveryHref({ sort: "newest" })}>
                             <Button variant="ghost" className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20">
                                 查看全部
                                 <ArrowRight className="h-4 w-4 ml-2" />
@@ -345,7 +373,7 @@ export default function Home() {
                                 </div>
                                 <CardHeader className="pb-3">
                                     <Badge variant="outline" className="w-fit mb-2 border-purple-200/50 dark:border-purple-800/50 text-slate-600 dark:text-slate-400">
-                                        {project.category}
+                                        {discoveryCategories.find((category) => category.slug === project.primaryCategory)?.label}
                                     </Badge>
                                     <CardTitle className="line-clamp-2 text-lg group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
                                         {project.title}
@@ -358,9 +386,9 @@ export default function Home() {
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between text-sm">
                                             <span className="text-slate-500 dark:text-slate-500">支持进度</span>
-                                            <span className="font-semibold text-slate-700 dark:text-slate-300">{project.progress}%</span>
+                                            <span className="font-semibold text-slate-700 dark:text-slate-300">{project.completionRate}%</span>
                                         </div>
-                                        <Progress value={project.progress} className="h-2" />
+                                        <Progress value={project.completionRate} className="h-2" />
                                         <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-500">
                                             <div className="flex items-center gap-1.5">
                                                 <Users className="h-4 w-4" />
@@ -370,6 +398,9 @@ export default function Home() {
                                                 <Clock className="h-4 w-4" />
                                                 <span>{project.daysLeft} 天剩余</span>
                                             </div>
+                                        </div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                                            当前阶段：{getDiscoveryStageLabel(project.stage)}
                                         </div>
                                     </div>
                                 </CardContent>
@@ -496,7 +527,7 @@ export default function Home() {
                         <div>
                             <h4 className="font-bold mb-4 text-slate-800 dark:text-slate-200">项目相关</h4>
                             <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
-                                <li><Link href="/projects" className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">浏览项目</Link></li>
+                                <li><Link href="/projects" className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">发现项目</Link></li>
                                 <li><Link href="/start" className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">发起项目</Link></li>
                                 <li><Link href="/guide" className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">项目指南</Link></li>
                                 <li><Link href="/cases" className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors">成功案例</Link></li>
