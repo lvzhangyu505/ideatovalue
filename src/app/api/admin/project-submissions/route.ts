@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
+import { sendProjectReviewNotificationMail } from '@/lib/project-notification-email';
 import { SUBMISSION_STATUS_VALUES } from '@/lib/project-submissions';
 import {
   createSupabaseServiceClient,
@@ -83,6 +84,15 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const data = reviewSchema.parse(body);
     const supabase = createSupabaseServiceClient();
+    const { data: submission, error: submissionError } = await supabase
+      .from('project_submissions')
+      .select('*')
+      .eq('id', data.submissionId)
+      .maybeSingle();
+
+    if (submissionError || !submission) {
+      return NextResponse.json({ message: '没有找到对应的项目申请。' }, { status: 404 });
+    }
 
     const { error } = await supabase
       .from('project_submissions')
@@ -96,6 +106,22 @@ export async function PATCH(request: Request) {
 
     if (error) {
       throw error;
+    }
+
+    try {
+      const origin = request.headers.get('origin') || new URL(request.url).origin;
+      await sendProjectReviewNotificationMail({
+        projectName: submission.project_name,
+        projectType: submission.project_type,
+        projectSubcategory: submission.project_subcategory,
+        recipientEmail: submission.contact_email || submission.user_email,
+        recipientName: submission.contact_name || submission.user_name || '发起人',
+        status: data.status,
+        reviewNote: data.reviewNote || null,
+        projectUrl: data.status === 'approved' ? `${origin}/projects/submission-${submission.id}` : null,
+      });
+    } catch (mailError) {
+      console.error('审核结果邮件发送失败，但审核状态已更新:', mailError);
     }
 
     return NextResponse.json({ success: true });

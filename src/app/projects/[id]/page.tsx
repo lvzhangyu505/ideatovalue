@@ -6,6 +6,9 @@ import {
   BookOpen,
   CheckCircle2,
   Clock,
+  Layers3,
+  ListChecks,
+  PackageOpen,
   Sparkles,
   Target,
   Users,
@@ -235,6 +238,34 @@ export default async function ProjectDetailPage({
                   </CardContent>
                 </Card>
 
+                {project.solution ? (
+                  <Card className="rounded-[28px] border border-purple-100/60 bg-white/75 shadow-xl shadow-purple-500/6 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/70">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Layers3 className="h-5 w-5 text-violet-500" />
+                        方案路径
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm leading-8 text-slate-600 dark:text-slate-400">
+                      {project.solution}
+                    </CardContent>
+                  </Card>
+                ) : null}
+
+                {project.verification ? (
+                  <Card className="rounded-[28px] border border-purple-100/60 bg-white/75 shadow-xl shadow-purple-500/6 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/70">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <ListChecks className="h-5 w-5 text-cyan-500" />
+                        验证标准
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm leading-8 text-slate-600 dark:text-slate-400">
+                      {project.verification}
+                    </CardContent>
+                  </Card>
+                ) : null}
+
                 <Card className="rounded-[28px] border border-purple-100/60 bg-white/75 shadow-xl shadow-purple-500/6 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/70">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -253,6 +284,45 @@ export default async function ProjectDetailPage({
                     </ul>
                   </CardContent>
                 </Card>
+
+                {(project.existingResources || project.neededResources) ? (
+                  <Card className="rounded-[28px] border border-purple-100/60 bg-white/75 shadow-xl shadow-purple-500/6 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/70">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <PackageOpen className="h-5 w-5 text-indigo-500" />
+                        资源现状
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {project.existingResources ? (
+                        <div>
+                          <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">当前已有资源</div>
+                          <div className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-400">{project.existingResources}</div>
+                        </div>
+                      ) : null}
+                      {project.neededResources ? (
+                        <div>
+                          <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">当前仍需支持</div>
+                          <div className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-400">{project.neededResources}</div>
+                        </div>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                ) : null}
+
+                {project.timeline ? (
+                  <Card className="rounded-[28px] border border-purple-100/60 bg-white/75 shadow-xl shadow-purple-500/6 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/70">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-sky-500" />
+                        时间安排
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm leading-8 text-slate-600 dark:text-slate-400">
+                      {project.timeline}
+                    </CardContent>
+                  </Card>
+                ) : null}
 
                 <Card className="rounded-[28px] border border-purple-100/60 bg-white/75 shadow-xl shadow-purple-500/6 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/70">
                   <CardHeader>

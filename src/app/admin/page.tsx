@@ -2,15 +2,24 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, Loader2, ShieldAlert, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Loader2, Search, ShieldAlert, XCircle } from 'lucide-react';
 
 import { AuthActions } from '@/components/auth-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuthUser } from '@/hooks/use-auth-user';
-import { getProjectSubcategoryOptions, PROJECT_TYPE_LABELS } from '@/lib/project-applications';
+import { getDiscoveryStageLabel } from '@/lib/project-discovery';
+import { getProjectSubcategoryOptions, PROJECT_TYPE_LABELS, PROJECT_TYPE_OPTIONS } from '@/lib/project-applications';
 import { type ProjectSubmissionRecord, getSubmissionStatusLabel } from '@/lib/project-submissions';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
@@ -20,6 +29,9 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [reviewNote, setReviewNote] = useState<Record<string, string>>({});
   const [submittingId, setSubmittingId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [typeFilter, setTypeFilter] = useState('all');
 
   const isAdmin = useMemo(() => {
     const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '')
@@ -118,6 +130,22 @@ export default function AdminPage() {
   }
 
   const pendingSubmissions = submissions.filter((submission) => submission.status === 'pending');
+  const filteredSubmissions = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    return submissions.filter((submission) => {
+      const matchesStatus = statusFilter === 'all' || submission.status === statusFilter;
+      const matchesType = typeFilter === 'all' || submission.project_type === typeFilter;
+      const matchesSearch =
+        !normalizedQuery ||
+        submission.project_name.toLowerCase().includes(normalizedQuery) ||
+        submission.user_name.toLowerCase().includes(normalizedQuery) ||
+        submission.user_email.toLowerCase().includes(normalizedQuery) ||
+        submission.description.toLowerCase().includes(normalizedQuery);
+
+      return matchesStatus && matchesType && matchesSearch;
+    });
+  }, [searchQuery, statusFilter, submissions, typeFilter]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/30 to-blue-50/20 dark:from-slate-950 dark:via-purple-950/20 dark:to-blue-950/10">
@@ -225,8 +253,53 @@ export default function AdminPage() {
                 </div>
               ) : null}
 
+              <Card className="rounded-3xl border-purple-100/50 bg-white/70 shadow-xl shadow-purple-500/10 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/70">
+                <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      placeholder="搜索项目名、发起人、邮箱或简介..."
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      className="h-11 rounded-full border-purple-200/60 bg-white/85 pl-10 dark:border-purple-800/50 dark:bg-slate-900/75"
+                    />
+                  </div>
+
+                  <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as 'all' | 'pending' | 'approved' | 'rejected')}>
+                    <SelectTrigger className="w-full rounded-full bg-white/85 lg:w-[180px] dark:bg-slate-900/75">
+                      <SelectValue placeholder="审核状态" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全部状态</SelectItem>
+                      <SelectItem value="pending">审核中</SelectItem>
+                      <SelectItem value="approved">已通过</SelectItem>
+                      <SelectItem value="rejected">未通过</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <SelectTrigger className="w-full rounded-full bg-white/85 lg:w-[180px] dark:bg-slate-900/75">
+                      <SelectValue placeholder="项目类型" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全部类型</SelectItem>
+                      {PROJECT_TYPE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </CardContent>
+              </Card>
+
               <div className="grid gap-5">
-                {submissions.map((submission) => (
+                {filteredSubmissions.length === 0 ? (
+                  <Card className="rounded-3xl border border-dashed border-purple-200/70 bg-white/70 p-10 text-center shadow-lg shadow-purple-500/5 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/60">
+                    <div className="text-sm text-slate-500 dark:text-slate-400">当前筛选条件下没有匹配的项目申请。</div>
+                  </Card>
+                ) : null}
+                {filteredSubmissions.map((submission) => (
                   <Card key={submission.id} className="rounded-3xl border-purple-100/50 bg-white/70 shadow-xl shadow-purple-500/10 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/70">
                     <CardHeader>
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -246,6 +319,11 @@ export default function AdminPage() {
                           <CardDescription>
                             发起人：{submission.user_name} · {submission.user_email}
                           </CardDescription>
+                          <div className="flex flex-wrap gap-2 pt-1 text-xs text-slate-500 dark:text-slate-400">
+                            <span>展示阶段：{getDiscoveryStageLabel(submission.public_stage)}</span>
+                            <span>推荐标签：{submission.badge_label || '平台审核通过'}</span>
+                            <span>进度：{submission.completion_rate}%</span>
+                          </div>
                         </div>
                         <div className="text-sm text-slate-500 dark:text-slate-400">
                           提交于 {new Date(submission.created_at).toLocaleString('zh-CN')}

@@ -21,6 +21,8 @@ import { AuthActions } from '@/components/auth-actions';
 import { useAuthUser } from '@/hooks/use-auth-user';
 import {
   type ProjectApplicationFormData,
+  PROJECT_BADGE_OPTIONS,
+  PROJECT_PUBLIC_STAGE_OPTIONS,
   getProjectSubcategoryOptions,
   PROJECT_TYPE_LABELS,
   PROJECT_TYPE_OPTIONS,
@@ -60,6 +62,13 @@ const initialFormData: ProjectApplicationFormData = {
   
   // 时间安排
   timeline: '',
+  publicStage: 'supporting',
+  badgeLabel: '平台审核通过',
+  completionRate: '0',
+  supporterCount: '0',
+  daysLeft: '30',
+  supportTiers: '',
+  latestUpdates: '',
   
   // 联系方式
   contactName: '',
@@ -82,6 +91,7 @@ const requiredFieldLabels: Array<[keyof typeof initialFormData, string]> = [
   ['keyRisks', '关键风险'],
   ['riskResponses', '应对思路'],
   ['timeline', '初步时间安排'],
+  ['publicStage', '公开展示阶段'],
   ['contactName', '联系人姓名'],
   ['contactEmail', '联系邮箱'],
 ];
@@ -154,6 +164,21 @@ export default function StartProjectPage() {
 
     if (missingFields.length > 0) {
       setSubmitError(`还有未填写的必填项：${missingFields.join('、')}。`);
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.contactEmail.trim())) {
+      setSubmitError('请填写正确的联系邮箱。');
+      return;
+    }
+
+    if (Number.parseInt(formData.completionRate || '0', 10) < 0 || Number.parseInt(formData.completionRate || '0', 10) > 100) {
+      setSubmitError('当前进度需要填写 0 到 100 之间的整数。');
+      return;
+    }
+
+    if (Number.parseInt(formData.supporterCount || '0', 10) < 0 || Number.parseInt(formData.daysLeft || '0', 10) < 0) {
+      setSubmitError('预估支持人数和剩余时间不能为负数。');
       return;
     }
 
@@ -527,6 +552,105 @@ export default function StartProjectPage() {
                     />
                   </div>
 
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label htmlFor="publicStage">公开展示阶段 *</Label>
+                      <Select
+                        value={formData.publicStage}
+                        onValueChange={(value) => setFormData({...formData, publicStage: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="请选择公开展示阶段" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PROJECT_PUBLIC_STAGE_OPTIONS.map((option) => (
+                            <SelectItem key={option.slug} value={option.slug}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="badgeLabel">推荐标签</Label>
+                      <Select
+                        value={formData.badgeLabel}
+                        onValueChange={(value) => setFormData({...formData, badgeLabel: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="请选择推荐标签" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PROJECT_BADGE_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div>
+                      <Label htmlFor="completionRate">当前进度（%）</Label>
+                      <Input
+                        id="completionRate"
+                        type="number"
+                        min="0"
+                        max="100"
+                        placeholder="0-100"
+                        value={formData.completionRate}
+                        onChange={(e) => setFormData({...formData, completionRate: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="supporterCount">预估支持人数</Label>
+                      <Input
+                        id="supporterCount"
+                        type="number"
+                        min="0"
+                        placeholder="例如 128"
+                        value={formData.supporterCount}
+                        onChange={(e) => setFormData({...formData, supporterCount: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="daysLeft">剩余天数</Label>
+                      <Input
+                        id="daysLeft"
+                        type="number"
+                        min="0"
+                        placeholder="例如 21"
+                        value={formData.daysLeft}
+                        onChange={(e) => setFormData({...formData, daysLeft: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="supportTiers">支持档位</Label>
+                    <Textarea
+                      id="supportTiers"
+                      placeholder={'请按每行一个档位填写，例如：\n29 元：感谢支持，获得阶段更新邮件\n99 元：首轮观看资格'}
+                      value={formData.supportTiers}
+                      onChange={(e) => setFormData({...formData, supportTiers: e.target.value})}
+                      rows={5}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="latestUpdates">最新更新</Label>
+                    <Textarea
+                      id="latestUpdates"
+                      placeholder={'请按每行一条更新填写，例如：\n已完成第一版原型设计\n正在招募首批测试用户'}
+                      value={formData.latestUpdates}
+                      onChange={(e) => setFormData({...formData, latestUpdates: e.target.value})}
+                      rows={4}
+                    />
+                  </div>
+
                   <div className="bg-muted/30 p-4 rounded-lg">
                     <h4 className="font-semibold mb-2">时间安排建议：</h4>
                     <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
@@ -534,6 +658,7 @@ export default function StartProjectPage() {
                       <li>预留缓冲时间，应对不可预见情况</li>
                       <li>设置里程碑节点，便于跟踪进度</li>
                       <li>考虑项目规模和资源情况，设定合理的时间表</li>
+                      <li>支持档位和更新内容越清晰，审核通过后越容易直接公开展示</li>
                     </ul>
                   </div>
                 </div>
@@ -620,6 +745,39 @@ export default function StartProjectPage() {
                         <h4 className="font-semibold text-sm text-muted-foreground mb-1">项目目标</h4>
                         <p className="whitespace-pre-line">{formData.goal || '（未填写）'}</p>
                       </div>
+
+                      <Separator />
+
+                      <div>
+                        <h4 className="font-semibold text-sm text-muted-foreground mb-1">公开展示配置</h4>
+                        <div className="space-y-2 text-sm">
+                          <p>展示阶段：{PROJECT_PUBLIC_STAGE_OPTIONS.find((option) => option.slug === formData.publicStage)?.label || '（未选择）'}</p>
+                          <p>推荐标签：{formData.badgeLabel || '平台审核通过'}</p>
+                          <p>当前进度：{formData.completionRate || '0'}%</p>
+                          <p>预估支持人数：{formData.supporterCount || '0'}</p>
+                          <p>剩余天数：{formData.daysLeft || '0'} 天</p>
+                        </div>
+                      </div>
+
+                      {formData.supportTiers.trim() ? (
+                        <>
+                          <Separator />
+                          <div>
+                            <h4 className="font-semibold text-sm text-muted-foreground mb-1">支持档位</h4>
+                            <p className="whitespace-pre-line">{formData.supportTiers}</p>
+                          </div>
+                        </>
+                      ) : null}
+
+                      {formData.latestUpdates.trim() ? (
+                        <>
+                          <Separator />
+                          <div>
+                            <h4 className="font-semibold text-sm text-muted-foreground mb-1">最新更新</h4>
+                            <p className="whitespace-pre-line">{formData.latestUpdates}</p>
+                          </div>
+                        </>
+                      ) : null}
                       
                       <Separator />
                       

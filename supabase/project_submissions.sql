@@ -21,6 +21,13 @@ create table if not exists public.project_submissions (
   key_risks text not null,
   risk_responses text not null,
   timeline text not null,
+  public_stage text not null default 'supporting',
+  badge_label text not null default '平台审核通过',
+  completion_rate integer not null default 0,
+  supporter_count integer not null default 0,
+  days_left integer not null default 30,
+  support_tiers jsonb not null default '[]'::jsonb,
+  latest_updates jsonb not null default '[]'::jsonb,
   contact_name text not null,
   contact_email text not null,
   contact_phone text,
@@ -29,6 +36,37 @@ create table if not exists public.project_submissions (
   review_note text,
   reviewed_at timestamptz
 );
+
+alter table public.project_submissions
+  add column if not exists public_stage text not null default 'supporting';
+
+alter table public.project_submissions
+  add column if not exists badge_label text not null default '平台审核通过';
+
+alter table public.project_submissions
+  add column if not exists completion_rate integer not null default 0;
+
+alter table public.project_submissions
+  add column if not exists supporter_count integer not null default 0;
+
+alter table public.project_submissions
+  add column if not exists days_left integer not null default 30;
+
+alter table public.project_submissions
+  add column if not exists support_tiers jsonb not null default '[]'::jsonb;
+
+alter table public.project_submissions
+  add column if not exists latest_updates jsonb not null default '[]'::jsonb;
+
+update public.project_submissions
+set
+  public_stage = coalesce(nullif(public_stage, ''), 'supporting'),
+  badge_label = coalesce(nullif(badge_label, ''), '平台审核通过'),
+  completion_rate = coalesce(completion_rate, 0),
+  supporter_count = coalesce(supporter_count, 0),
+  days_left = coalesce(days_left, 30),
+  support_tiers = coalesce(support_tiers, '[]'::jsonb),
+  latest_updates = coalesce(latest_updates, '[]'::jsonb);
 
 create index if not exists project_submissions_user_id_idx on public.project_submissions(user_id);
 create index if not exists project_submissions_status_idx on public.project_submissions(status);

@@ -1,4 +1,5 @@
-import type { DiscoveryProject } from '@/lib/project-discovery';
+import type { DiscoveryProject, DiscoverySupportTier } from '@/lib/project-discovery';
+import { getRecommendedSlugFromBadgeLabel } from '@/lib/project-applications';
 
 export const SUBMISSION_STATUS_VALUES = ['pending', 'approved', 'rejected'] as const;
 export type SubmissionStatus = (typeof SUBMISSION_STATUS_VALUES)[number];
@@ -24,6 +25,13 @@ export type ProjectSubmissionRecord = {
   key_risks: string;
   risk_responses: string;
   timeline: string;
+  public_stage: string;
+  badge_label: string | null;
+  completion_rate: number;
+  supporter_count: number;
+  days_left: number;
+  support_tiers: unknown;
+  latest_updates: unknown;
   contact_name: string;
   contact_email: string;
   contact_phone: string | null;
@@ -61,6 +69,31 @@ export function splitMultilineText(value: string) {
     .filter(Boolean);
 }
 
+function isSupportTier(value: unknown): value is DiscoverySupportTier {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      typeof (value as { amount?: unknown }).amount === 'number' &&
+      typeof (value as { description?: unknown }).description === 'string'
+  );
+}
+
+export function normalizeSupportTiers(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [] as DiscoverySupportTier[];
+  }
+
+  return value.filter(isSupportTier);
+}
+
+export function normalizeStringArray(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [] as string[];
+  }
+
+  return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+}
+
 export function toPublicProjectId(submissionId: string) {
   return `submission-${submissionId}`;
 }
@@ -70,6 +103,11 @@ export function fromPublicProjectId(projectId: string) {
 }
 
 export function mapSubmissionToDiscoveryProject(submission: ProjectSubmissionRecord): DiscoveryProject {
+  const normalizedBadgeLabel = submission.badge_label?.trim() || '平台审核通过';
+  const normalizedUpdates = normalizeStringArray(submission.latest_updates);
+  const normalizedTiers = normalizeSupportTiers(submission.support_tiers);
+  const recommendedSlug = getRecommendedSlugFromBadgeLabel(normalizedBadgeLabel);
+
   return {
     id: toPublicProjectId(submission.id),
     title: submission.project_name,
@@ -79,20 +117,29 @@ export function mapSubmissionToDiscoveryProject(submission: ProjectSubmissionRec
     creator: submission.user_name || submission.contact_name,
     primaryCategory: submission.project_type,
     secondaryCategory: submission.project_subcategory,
-    stage: submission.status === 'approved' ? 'supporting' : 'reviewing',
-    badgeLabel: submission.status === 'approved' ? '已通过审核' : '审核中',
+    stage: submission.status === 'approved' ? submission.public_stage || 'supporting' : 'reviewing',
+    badgeLabel: submission.status === 'approved' ? normalizedBadgeLabel : '审核中',
     goal: submission.goal,
-    supporters: 0,
-    completionRate: 0,
-    daysLeft: 30,
+    supporters: submission.supporter_count || 0,
+    completionRate: submission.completion_rate || 0,
+    daysLeft: submission.days_left || 0,
     publishedAt: submission.created_at,
     emoji: categoryEmojiMap[submission.project_type] || '✨',
-    recommendations: submission.status === 'approved' ? ['new'] : [],
-    tiers: [],
+    recommendations: submission.status === 'approved' && recommendedSlug ? [recommendedSlug] : [],
+    tiers: normalizedTiers,
     risks: splitMultilineText(submission.key_risks),
     updates:
       submission.status === 'approved'
-        ? ['项目已通过平台审核，现已公开展示。']
+        ? normalizedUpdates.length > 0
+          ? normalizedUpdates
+          : ['项目已通过平台审核，现已公开展示。']
         : ['项目已提交，正在等待平台审核结果。'],
+    audience: submission.audience,
+    solution: submission.solution,
+    verification: submission.verification,
+    existingResources: submission.existing_resources,
+    neededResources: submission.needed_resources,
+    riskResponses: submission.risk_responses,
+    timeline: submission.timeline,
   };
 }

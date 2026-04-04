@@ -1,4 +1,4 @@
-import { discoveryCategories } from '@/lib/project-discovery';
+import { discoveryCategories, discoveryProjectStages, discoveryRecommendedViews } from '@/lib/project-discovery';
 
 export type ProjectApplicationFormData = {
   projectName: string;
@@ -15,6 +15,13 @@ export type ProjectApplicationFormData = {
   keyRisks: string;
   riskResponses: string;
   timeline: string;
+  publicStage: string;
+  badgeLabel: string;
+  completionRate: string;
+  supporterCount: string;
+  daysLeft: string;
+  supportTiers: string;
+  latestUpdates: string;
   contactName: string;
   contactEmail: string;
   contactPhone: string;
@@ -53,6 +60,22 @@ export const PROJECT_TYPE_OPTIONS = discoveryCategories.map((category) => ({
   label: category.label,
 }));
 
+export const PROJECT_PUBLIC_STAGE_OPTIONS = discoveryProjectStages.filter(
+  (stage) => stage.slug !== 'applying' && stage.slug !== 'reviewing'
+);
+
+export const PROJECT_BADGE_OPTIONS = [
+  ...discoveryRecommendedViews.map((view) => ({
+    value: view.label,
+    label: view.label,
+  })),
+  { value: '共创指导位', label: '共创指导位' },
+  { value: '逻辑闭环完成', label: '逻辑闭环完成' },
+  { value: '已通过初审', label: '已通过初审' },
+  { value: '编辑精选', label: '编辑精选' },
+  { value: '平台审核通过', label: '平台审核通过' },
+];
+
 export function getProjectSubcategoryOptions(projectType: string) {
   return (
     discoveryCategories
@@ -62,6 +85,10 @@ export function getProjectSubcategoryOptions(projectType: string) {
         label: category.label,
       })) ?? []
   );
+}
+
+export function getRecommendedSlugFromBadgeLabel(badgeLabel: string) {
+  return discoveryRecommendedViews.find((view) => view.label === badgeLabel)?.slug ?? null;
 }
 
 export function getStoredProjectApplications(ownerEmail?: string | null) {

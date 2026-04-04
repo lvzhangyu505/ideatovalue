@@ -47,6 +47,13 @@ export type DiscoveryProject = {
   tiers: DiscoverySupportTier[];
   risks: string[];
   updates: string[];
+  audience?: string;
+  solution?: string;
+  verification?: string;
+  existingResources?: string;
+  neededResources?: string;
+  riskResponses?: string;
+  timeline?: string;
 };
 
 export const discoveryCategories: DiscoveryPrimaryCategory[] = [
