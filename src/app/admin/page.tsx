@@ -27,6 +27,7 @@ export default function AdminPage() {
   const { user, isLoading, isConfigured } = useAuthUser();
   const [submissions, setSubmissions] = useState<ProjectSubmissionRecord[]>([]);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [reviewNote, setReviewNote] = useState<Record<string, string>>({});
   const [submittingId, setSubmittingId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,6 +91,7 @@ export default function AdminPage() {
     try {
       setSubmittingId(submissionId);
       setError('');
+      setSuccessMessage('');
 
       const supabase = getSupabaseBrowserClient();
       const {
@@ -114,12 +116,16 @@ export default function AdminPage() {
         }),
       });
 
-      const result = (await response.json()) as { message?: string };
+      const result = (await response.json()) as { message?: string; mailSent?: boolean };
       if (!response.ok) {
         setError(result.message || '审核操作失败。');
         return;
       }
 
+      setSuccessMessage(
+        result.message ||
+          (result.mailSent ? '审核已完成，通知邮件已发送。' : '审核已完成，但通知邮件未发送。')
+      );
       await loadSubmissions();
     } catch (reviewError) {
       console.error('审核操作失败:', reviewError);
@@ -250,6 +256,12 @@ export default function AdminPage() {
               {error ? (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
                   {error}
+                </div>
+              ) : null}
+
+              {successMessage ? (
+                <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-200">
+                  {successMessage}
                 </div>
               ) : null}
 

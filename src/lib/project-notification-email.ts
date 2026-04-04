@@ -11,6 +11,11 @@ type SendMailInput = {
   replyTo?: string;
 };
 
+export type ProjectMailResult = {
+  sent: boolean;
+  message: string;
+};
+
 type ApplicationNotificationInput = {
   projectName: string;
   projectType: string;
@@ -94,7 +99,10 @@ export async function sendProjectNotificationMail({ to, subject, text, html, rep
   const { smtpHost, smtpPort, smtpUser, smtpPass, mailFrom } = getMailConfig();
 
   if (!smtpHost || !smtpUser || !smtpPass || !mailFrom) {
-    return false;
+    return {
+      sent: false,
+      message: 'SMTP 未配置完整，暂未发送邮件。',
+    } satisfies ProjectMailResult;
   }
 
   const transporter = nodemailer.createTransport({
@@ -116,7 +124,10 @@ export async function sendProjectNotificationMail({ to, subject, text, html, rep
     html,
   });
 
-  return true;
+  return {
+    sent: true,
+    message: '邮件已发送。',
+  } satisfies ProjectMailResult;
 }
 
 export async function sendProjectApplicationAdminMail(input: ApplicationNotificationInput) {

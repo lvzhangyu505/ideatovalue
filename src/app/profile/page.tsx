@@ -4,12 +4,15 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
-  FolderKanban,
-  Mail,
-  Rocket,
-  UserRound,
   CalendarClock,
+  ExternalLink,
+  FolderKanban,
+  Loader2,
+  Mail,
+  PencilLine,
+  Rocket,
   ShieldCheck,
+  UserRound,
 } from 'lucide-react';
 
 import { AuthActions } from '@/components/auth-actions';
@@ -17,13 +20,50 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { useAuthUser } from '@/hooks/use-auth-user';
-import { type ProjectSubmissionRecord, getSubmissionStatusLabel } from '@/lib/project-submissions';
+import { getDiscoveryStageLabel } from '@/lib/project-discovery';
 import {
   getProjectSubcategoryOptions,
+  PROJECT_BADGE_OPTIONS,
+  PROJECT_PUBLIC_STAGE_OPTIONS,
   PROJECT_TYPE_LABELS,
 } from '@/lib/project-applications';
+import {
+  type ProjectSubmissionRecord,
+  getSubmissionStatusLabel,
+  normalizeStringArray,
+  normalizeSupportTiers,
+  toPublicProjectId,
+} from '@/lib/project-submissions';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+
+type ProjectPublicInfoForm = {
+  submissionId: string;
+  publicStage: string;
+  badgeLabel: string;
+  completionRate: string;
+  supporterCount: string;
+  daysLeft: string;
+  supportTiers: string;
+  latestUpdates: string;
+};
 
 function getDisplayName(email: string | undefined, metadataName: unknown) {
   if (typeof metadataName === 'string' && metadataName.trim()) {
@@ -47,49 +87,122 @@ function getInitials(name: string) {
   return normalized.slice(0, 2).toUpperCase();
 }
 
+function toEditForm(application: ProjectSubmissionRecord): ProjectPublicInfoForm {
+  return {
+    submissionId: application.id,
+    publicStage: application.public_stage || 'supporting',
+    badgeLabel: application.badge_label || '平台审核通过',
+    completionRate: String(application.completion_rate ?? 0),
+    supporterCount: String(application.supporter_count ?? 0),
+    daysLeft: String(application.days_left ?? 0),
+    supportTiers: normalizeSupportTiers(application.support_tiers)
+      .map((tier) => `${tier.amount} 元：${tier.description}`)
+      .join('\n'),
+    latestUpdates: normalizeStringArray(application.latest_updates).join('\n'),
+  };
+}
+
 export default function ProfilePage() {
   const { user, isLoading } = useAuthUser();
   const [applications, setApplications] = useState<ProjectSubmissionRecord[]>([]);
+  const [editingSubmissionId, setEditingSubmissionId] = useState('');
+  const [editForm, setEditForm] = useState<ProjectPublicInfoForm | null>(null);
+  const [editError, setEditError] = useState('');
+  const [editSuccess, setEditSuccess] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  useEffect(() => {
+  async function loadApplications() {
     if (!user) {
       setApplications([]);
       return;
     }
 
-    async function loadApplications() {
-      try {
-        const supabase = getSupabaseBrowserClient();
-        const {
-          data: { session },
-        } = (await supabase?.auth.getSession()) ?? { data: { session: null } };
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const {
+        data: { session },
+      } = (await supabase?.auth.getSession()) ?? { data: { session: null } };
 
-        if (!session?.access_token) {
-          setApplications([]);
-          return;
-        }
-
-        const response = await fetch('/api/my-project-submissions', {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
-
-        if (!response.ok) {
-          setApplications([]);
-          return;
-        }
-
-        const result = (await response.json()) as { submissions?: ProjectSubmissionRecord[] };
-        setApplications(result.submissions || []);
-      } catch (error) {
-        console.error('读取我的项目申请失败:', error);
+      if (!session?.access_token) {
         setApplications([]);
+        return;
       }
-    }
 
+      const response = await fetch('/api/my-project-submissions', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        setApplications([]);
+        return;
+      }
+
+      const result = (await response.json()) as { submissions?: ProjectSubmissionRecord[] };
+      setApplications(result.submissions || []);
+    } catch (error) {
+      console.error('读取我的项目申请失败:', error);
+      setApplications([]);
+    }
+  }
+
+  useEffect(() => {
     void loadApplications();
   }, [user]);
+
+  async function handleSavePublicInfo() {
+    if (!editForm) {
+      return;
+    }
+
+    setEditError('');
+    setEditSuccess('');
+
+    const supabase = getSupabaseBrowserClient();
+    const {
+      data: { session },
+    } = (await supabase?.auth.getSession()) ?? { data: { session: null } };
+
+    if (!session?.access_token) {
+      setEditError('当前登录状态已失效，请重新登录。');
+      return;
+    }
+
+    setIsSavingEdit(true);
+
+    try {
+      const response = await fetch('/api/my-project-submissions', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(editForm),
+      });
+
+      const result = (await response.json()) as { message?: string };
+
+      if (!response.ok) {
+        setEditError(result.message || '公开信息更新失败。');
+        return;
+      }
+
+      setEditSuccess(result.message || '公开信息已更新。');
+      await loadApplications();
+      setTimeout(() => {
+        setEditingSubmissionId('');
+        setEditForm(null);
+        setEditError('');
+        setEditSuccess('');
+      }, 800);
+    } catch (error) {
+      console.error('更新项目公开信息失败:', error);
+      setEditError('更新项目公开信息失败，请稍后重试。');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
 
   const displayName = getDisplayName(user?.email, user?.user_metadata.display_name);
   const avatarUrl =
@@ -313,6 +426,34 @@ export default function ProfilePage() {
                                 <div className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">{application.needed_resources}</div>
                               </div>
                             </div>
+
+                            <div className="mt-4 flex flex-wrap items-center gap-3">
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingSubmissionId(application.id);
+                                  setEditForm(toEditForm(application));
+                                  setEditError('');
+                                  setEditSuccess('');
+                                }}
+                              >
+                                <PencilLine className="mr-2 h-4 w-4" />
+                                {normalizeSupportTiers(application.support_tiers).length > 0 ? '编辑公开信息' : '补充公开信息'}
+                              </Button>
+                              {application.status === 'approved' ? (
+                                <Link href={`/projects/${toPublicProjectId(application.id)}`}>
+                                  <Button variant="ghost" className="text-purple-600 hover:text-purple-700 dark:text-purple-300 dark:hover:text-purple-200">
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    查看项目详情
+                                  </Button>
+                                </Link>
+                              ) : null}
+                              <div className="text-sm text-slate-500 dark:text-slate-400">
+                                展示阶段：{getDiscoveryStageLabel(application.public_stage)}
+                                {' · '}
+                                推荐标签：{application.badge_label || '平台审核通过'}
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -324,6 +465,155 @@ export default function ProfilePage() {
           )}
         </div>
       </section>
+
+      <Dialog
+        open={Boolean(editingSubmissionId && editForm)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingSubmissionId('');
+            setEditForm(null);
+            setEditError('');
+            setEditSuccess('');
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>补充公开信息</DialogTitle>
+            <DialogDescription>发起人可以在这里补充支持档位、最新更新和展示信息，审核通过后的详情页会自动同步。</DialogDescription>
+          </DialogHeader>
+
+          {editForm ? (
+            <div className="space-y-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="publicStage">公开展示阶段</Label>
+                  <Select
+                    value={editForm.publicStage}
+                    onValueChange={(value) => setEditForm((current) => (current ? { ...current, publicStage: value } : current))}
+                  >
+                    <SelectTrigger id="publicStage">
+                      <SelectValue placeholder="请选择展示阶段" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROJECT_PUBLIC_STAGE_OPTIONS.map((option) => (
+                        <SelectItem key={option.slug} value={option.slug}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="badgeLabel">推荐标签</Label>
+                  <Select
+                    value={editForm.badgeLabel}
+                    onValueChange={(value) => setEditForm((current) => (current ? { ...current, badgeLabel: value } : current))}
+                  >
+                    <SelectTrigger id="badgeLabel">
+                      <SelectValue placeholder="请选择推荐标签" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROJECT_BADGE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <Label htmlFor="completionRate">当前进度（%）</Label>
+                  <Input
+                    id="completionRate"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={editForm.completionRate}
+                    onChange={(event) => setEditForm((current) => (current ? { ...current, completionRate: event.target.value } : current))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="supporterCount">支持人数</Label>
+                  <Input
+                    id="supporterCount"
+                    type="number"
+                    min="0"
+                    value={editForm.supporterCount}
+                    onChange={(event) => setEditForm((current) => (current ? { ...current, supporterCount: event.target.value } : current))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="daysLeft">剩余天数</Label>
+                  <Input
+                    id="daysLeft"
+                    type="number"
+                    min="0"
+                    value={editForm.daysLeft}
+                    onChange={(event) => setEditForm((current) => (current ? { ...current, daysLeft: event.target.value } : current))}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="supportTiers">支持档位</Label>
+                <Textarea
+                  id="supportTiers"
+                  rows={6}
+                  placeholder={'请按每行一个档位填写，例如：\n29 元：感谢支持，获得阶段更新邮件\n99 元：首轮观看资格'}
+                  value={editForm.supportTiers}
+                  onChange={(event) => setEditForm((current) => (current ? { ...current, supportTiers: event.target.value } : current))}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="latestUpdates">最新更新</Label>
+                <Textarea
+                  id="latestUpdates"
+                  rows={5}
+                  placeholder={'请按每行一条填写，例如：\n已完成第一版原型\n正在招募首批测试用户'}
+                  value={editForm.latestUpdates}
+                  onChange={(event) => setEditForm((current) => (current ? { ...current, latestUpdates: event.target.value } : current))}
+                />
+              </div>
+
+              {editError ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+                  {editError}
+                </div>
+              ) : null}
+
+              {editSuccess ? (
+                <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-200">
+                  {editSuccess}
+                </div>
+              ) : null}
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditingSubmissionId('');
+                    setEditForm(null);
+                    setEditError('');
+                    setEditSuccess('');
+                  }}
+                >
+                  取消
+                </Button>
+                <Button onClick={() => void handleSavePublicInfo()} disabled={isSavingEdit}>
+                  {isSavingEdit ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PencilLine className="mr-2 h-4 w-4" />}
+                  保存公开信息
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

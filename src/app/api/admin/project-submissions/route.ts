@@ -108,9 +108,14 @@ export async function PATCH(request: Request) {
       throw error;
     }
 
+    let mailResult = {
+      sent: false,
+      message: '未执行邮件发送。',
+    };
+
     try {
       const origin = request.headers.get('origin') || new URL(request.url).origin;
-      await sendProjectReviewNotificationMail({
+      mailResult = await sendProjectReviewNotificationMail({
         projectName: submission.project_name,
         projectType: submission.project_type,
         projectSubcategory: submission.project_subcategory,
@@ -122,9 +127,17 @@ export async function PATCH(request: Request) {
       });
     } catch (mailError) {
       console.error('审核结果邮件发送失败，但审核状态已更新:', mailError);
+      mailResult = {
+        sent: false,
+        message: '审核状态已更新，但邮件发送失败，请检查 SMTP 配置或收件地址。',
+      };
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      mailSent: mailResult.sent,
+      message: mailResult.message,
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ message: '审核参数不正确。' }, { status: 400 });
