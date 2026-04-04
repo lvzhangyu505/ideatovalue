@@ -22,6 +22,7 @@ import { useAuthUser } from '@/hooks/use-auth-user';
 import {
   type ProjectApplicationFormData,
   PROJECT_TYPE_LABELS,
+  PROJECT_TYPE_OPTIONS,
   saveProjectApplication,
 } from '@/lib/project-applications';
 import { 
@@ -322,11 +323,11 @@ export default function StartProjectPage() {
                         <SelectValue placeholder="请选择项目类型" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="content">内容型</SelectItem>
-                        <SelectItem value="activity">活动型</SelectItem>
-                        <SelectItem value="product">产品型</SelectItem>
-                        <SelectItem value="service">服务型</SelectItem>
-                        <SelectItem value="experiment">社群实验型</SelectItem>
+                        {PROJECT_TYPE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

@@ -2,11 +2,13 @@ import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { z } from 'zod';
 
+import { PROJECT_TYPE_LABELS, PROJECT_TYPE_VALUES } from '@/lib/project-applications';
+
 export const runtime = 'nodejs';
 
 const projectApplicationSchema = z.object({
   projectName: z.string().trim().min(1),
-  projectType: z.enum(['content', 'activity', 'product', 'service', 'experiment']),
+  projectType: z.enum(PROJECT_TYPE_VALUES),
   description: z.string().trim().min(1),
   goal: z.string().trim().min(1),
   problem: z.string().trim().min(1),
@@ -22,14 +24,6 @@ const projectApplicationSchema = z.object({
   contactEmail: z.string().trim().email(),
   contactPhone: z.string().trim().optional().default(''),
 });
-
-const projectTypeLabels = {
-  content: '内容型',
-  activity: '活动型',
-  product: '产品型',
-  service: '服务型',
-  experiment: '社群实验型',
-} as const;
 
 function escapeHtml(value: string) {
   return value
@@ -48,7 +42,7 @@ function buildTextContent(data: z.infer<typeof projectApplicationSchema>) {
   return `ideatovalue 收到新的项目申请
 
 项目名称：${data.projectName}
-项目类型：${projectTypeLabels[data.projectType]}
+项目类型：${PROJECT_TYPE_LABELS[data.projectType]}
 项目简介：${data.description}
 
 项目目标：
@@ -90,7 +84,7 @@ ${data.timeline}
 function buildHtmlContent(data: z.infer<typeof projectApplicationSchema>) {
   const sections: Array<[string, string]> = [
     ['项目名称', escapeHtml(data.projectName)],
-    ['项目类型', escapeHtml(projectTypeLabels[data.projectType])],
+    ['项目类型', escapeHtml(PROJECT_TYPE_LABELS[data.projectType])],
     ['项目简介', formatMultilineHtml(data.description)],
     ['项目目标', formatMultilineHtml(data.goal)],
     ['要解决的问题', formatMultilineHtml(data.problem)],

@@ -1,3 +1,5 @@
+import { discoveryCategories } from '@/lib/project-discovery';
+
 export type ProjectApplicationFormData = {
   projectName: string;
   projectType: string;
@@ -27,13 +29,28 @@ export type StoredProjectApplication = ProjectApplicationFormData & {
 
 export const PROJECT_APPLICATION_STORAGE_KEY = 'ideatovalue.project-applications';
 
+export const PROJECT_TYPE_VALUES = [
+  'content',
+  'product',
+  'service',
+  'community',
+  'public-good',
+  'event',
+] as const;
+
 export const PROJECT_TYPE_LABELS: Record<string, string> = {
   content: '内容型',
-  activity: '活动型',
   product: '产品型',
   service: '服务型',
-  experiment: '社群实验型',
+  community: '社群型',
+  'public-good': '公益型',
+  event: '活动型',
 };
+
+export const PROJECT_TYPE_OPTIONS = discoveryCategories.map((category) => ({
+  value: category.slug,
+  label: category.label,
+}));
 
 export function getStoredProjectApplications(ownerEmail?: string | null) {
   if (typeof window === 'undefined') {
