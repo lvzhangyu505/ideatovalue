@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowRight, Clock, Search, SlidersHorizontal, Sparkles, Users } from 'lucide-react';
@@ -46,7 +46,7 @@ const sortOptions = [
   { value: 'completion', label: '高完成度' },
 ] as const;
 
-export default function ProjectsPage() {
+function ProjectsPageContent() {
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPrimary, setSelectedPrimary] = useState('all');
@@ -391,5 +391,38 @@ export default function ProjectsPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function ProjectsPageFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/30 to-blue-50/20 dark:from-slate-950 dark:via-purple-950/20 dark:to-blue-950/10">
+      <div className="border-b border-purple-100/50 bg-white/70 py-12 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-950/70">
+        <div className="container mx-auto px-6 lg:px-12">
+          <div className="h-10 w-56 rounded-full bg-slate-200/80 dark:bg-slate-800/80" />
+          <div className="mt-4 h-5 w-full max-w-2xl rounded-full bg-slate-200/70 dark:bg-slate-800/70" />
+        </div>
+      </div>
+
+      <div className="container mx-auto px-6 py-8 lg:px-12">
+        <div className="h-28 rounded-[32px] bg-white/70 shadow-lg shadow-purple-500/5 backdrop-blur-xl dark:bg-slate-900/65" />
+        <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-[420px] rounded-[28px] bg-white/70 shadow-lg shadow-purple-500/5 backdrop-blur-xl dark:bg-slate-900/65"
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ProjectsPage() {
+  return (
+    <Suspense fallback={<ProjectsPageFallback />}>
+      <ProjectsPageContent />
+    </Suspense>
   );
 }
