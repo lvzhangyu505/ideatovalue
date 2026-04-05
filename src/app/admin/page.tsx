@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, Loader2, Search, ShieldAlert, XCircle } from 'lucide-react';
+import { Activity, ArrowLeft, CheckCircle2, Loader2, Search, ShieldAlert, XCircle } from 'lucide-react';
 
 import { AuthActions } from '@/components/auth-actions';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +20,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuthUser } from '@/hooks/use-auth-user';
 import { getDiscoveryStageLabel } from '@/lib/project-discovery';
 import { getProjectSubcategoryOptions, PROJECT_TYPE_LABELS, PROJECT_TYPE_OPTIONS } from '@/lib/project-applications';
-import { type ProjectSubmissionRecord, getSubmissionStatusLabel } from '@/lib/project-submissions';
+import {
+  type ProjectSubmissionRecord,
+  getSubmissionStatusLabel,
+  normalizeProgressUpdates,
+} from '@/lib/project-submissions';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export default function AdminPage() {
@@ -319,7 +323,11 @@ export default function AdminPage() {
                     <div className="text-sm text-slate-500 dark:text-slate-400">当前筛选条件下没有匹配的项目申请。</div>
                   </Card>
                 ) : null}
-                {filteredSubmissions.map((submission) => (
+                {filteredSubmissions.map((submission) => {
+                  const progressUpdates = normalizeProgressUpdates(submission.progress_updates);
+                  const latestProgressUpdate = progressUpdates[0];
+
+                  return (
                   <Card key={submission.id} className="rounded-3xl border-purple-100/50 bg-white/70 shadow-xl shadow-purple-500/10 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/70">
                     <CardHeader>
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -343,7 +351,9 @@ export default function AdminPage() {
                             <span>展示阶段：{getDiscoveryStageLabel(submission.public_stage)}</span>
                             <span>推荐标签：{submission.badge_label || '平台审核通过'}</span>
                             <span>进度：{submission.completion_rate}%</span>
-                            {submission.updated_at !== submission.created_at ? (
+                            {latestProgressUpdate ? (
+                              <span className="text-purple-600 dark:text-purple-300">发起人最近更新了项目进度</span>
+                            ) : submission.updated_at !== submission.created_at ? (
                               <span className="text-purple-600 dark:text-purple-300">发起人最近补充过公开信息</span>
                             ) : null}
                           </div>
@@ -364,6 +374,27 @@ export default function AdminPage() {
                           <div className="mt-2 text-sm leading-7 text-slate-700 dark:text-slate-300">{submission.goal}</div>
                         </div>
                       </div>
+
+                      {latestProgressUpdate ? (
+                        <div className="rounded-2xl border border-purple-200/70 bg-purple-50/60 p-4 dark:border-purple-900/40 dark:bg-purple-950/20">
+                          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
+                            <Activity className="h-4 w-4 text-purple-500" />
+                            最新项目进度
+                          </div>
+                          <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                            {latestProgressUpdate.title}
+                          </div>
+                          <div className="mt-2 text-sm leading-7 text-slate-700 dark:text-slate-300">
+                            {latestProgressUpdate.details}
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500 dark:text-slate-400">
+                            <span>{new Date(latestProgressUpdate.recordedAt).toLocaleString('zh-CN')}</span>
+                            <span>进度：{latestProgressUpdate.completionRate}%</span>
+                            <span>支持人数：{latestProgressUpdate.supporterCount}</span>
+                            <span>剩余时间：{latestProgressUpdate.daysLeft} 天</span>
+                          </div>
+                        </div>
+                      ) : null}
 
                       <div className="rounded-2xl bg-slate-50/80 p-4 dark:bg-slate-950/60">
                         <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">审核备注</div>
@@ -409,7 +440,8 @@ export default function AdminPage() {
                       )}
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

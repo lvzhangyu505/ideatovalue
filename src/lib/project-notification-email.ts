@@ -54,6 +54,21 @@ type ReviewNotificationInput = {
   projectUrl?: string | null;
 };
 
+type ProgressUpdateAdminNotificationInput = {
+  projectName: string;
+  projectType: string;
+  projectSubcategory: string;
+  projectStatus: SubmissionStatus;
+  founderName: string;
+  founderEmail: string;
+  publicStageLabel: string;
+  completionRate: number;
+  supporterCount: number;
+  daysLeft: number;
+  updateTitle: string;
+  updateDetails: string;
+};
+
 function escapeHtml(value: string) {
   return value
     .replaceAll('&', '&amp;')
@@ -332,6 +347,77 @@ ${projectLinkText}
   return sendProjectNotificationMail({
     to: input.recipientEmail,
     subject: `[ideatovalue] ${statusLabel}：${input.projectName}`,
+    text,
+    html,
+  });
+}
+
+export async function sendProjectProgressUpdateAdminMail(input: ProgressUpdateAdminNotificationInput) {
+  const mailTo = process.env.PROJECT_APPLICATION_TO?.trim() || 'lux932519@gmail.com';
+  const secondaryLabel = getSecondaryLabel(input.projectType, input.projectSubcategory);
+  const statusLabel =
+    input.projectStatus === 'approved'
+      ? '已通过'
+      : input.projectStatus === 'rejected'
+        ? '未通过'
+        : '审核中';
+
+  const text = `ideatovalue 收到发起人的项目进度更新
+
+项目名称：${input.projectName}
+项目类型：${PROJECT_TYPE_LABELS[input.projectType]}
+二级分类：${secondaryLabel}
+审核状态：${statusLabel}
+发起人：${input.founderName}
+发起人邮箱：${input.founderEmail}
+
+展示阶段：${input.publicStageLabel}
+当前进度：${input.completionRate}%
+支持人数：${input.supporterCount}
+剩余时间：${input.daysLeft} 天
+
+本次进度标题：
+${input.updateTitle}
+
+本次进度详情：
+${input.updateDetails}
+`;
+
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
+      <div style="max-width:760px;margin:0 auto;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #e2e8f0;">
+        <div style="padding:24px 28px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#ffffff;">
+          <h1 style="margin:0 0 8px;font-size:24px;">收到新的项目进度更新</h1>
+          <p style="margin:0;opacity:0.92;">${escapeHtml(input.projectName)}</p>
+        </div>
+        <div style="padding:24px 28px;line-height:1.9;color:#334155;">
+          <p style="margin:0 0 16px;">发起人更新了项目公开信息和进度记录，管理员可以进入后台进一步查看。</p>
+          <p style="margin:0 0 8px;"><strong>项目类型：</strong>${escapeHtml(PROJECT_TYPE_LABELS[input.projectType])}</p>
+          <p style="margin:0 0 8px;"><strong>二级分类：</strong>${escapeHtml(secondaryLabel)}</p>
+          <p style="margin:0 0 8px;"><strong>审核状态：</strong>${escapeHtml(statusLabel)}</p>
+          <p style="margin:0 0 8px;"><strong>发起人：</strong>${escapeHtml(input.founderName)}</p>
+          <p style="margin:0 0 20px;"><strong>联系邮箱：</strong>${escapeHtml(input.founderEmail)}</p>
+          <div style="padding:16px 18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;margin-bottom:16px;">
+            <div style="font-weight:600;margin-bottom:8px;">当前公开信息</div>
+            <div>展示阶段：${escapeHtml(input.publicStageLabel)}</div>
+            <div>当前进度：${escapeHtml(String(input.completionRate))}%</div>
+            <div>支持人数：${escapeHtml(String(input.supporterCount))}</div>
+            <div>剩余时间：${escapeHtml(String(input.daysLeft))} 天</div>
+          </div>
+          <div style="padding:16px 18px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:16px;">
+            <div style="font-weight:600;margin-bottom:8px;">本次进度记录</div>
+            <div style="font-weight:600;margin-bottom:8px;">${escapeHtml(input.updateTitle)}</div>
+            <div>${formatMultilineHtml(input.updateDetails)}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  return sendProjectNotificationMail({
+    to: mailTo,
+    replyTo: input.founderEmail,
+    subject: `[ideatovalue] 项目进度更新：${input.projectName}`,
     text,
     html,
   });

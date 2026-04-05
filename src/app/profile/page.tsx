@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
+  Activity,
   ArrowLeft,
   CalendarClock,
   ExternalLink,
@@ -46,8 +47,10 @@ import {
   PROJECT_TYPE_LABELS,
 } from '@/lib/project-applications';
 import {
+  type ProjectProgressUpdateRecord,
   type ProjectSubmissionRecord,
   getSubmissionStatusLabel,
+  normalizeProgressUpdates,
   normalizeStringArray,
   normalizeSupportTiers,
   toPublicProjectId,
@@ -63,6 +66,8 @@ type ProjectPublicInfoForm = {
   daysLeft: string;
   supportTiers: string;
   latestUpdates: string;
+  progressUpdateTitle: string;
+  progressUpdateDetails: string;
 };
 
 function getDisplayName(email: string | undefined, metadataName: unknown) {
@@ -99,7 +104,50 @@ function toEditForm(application: ProjectSubmissionRecord): ProjectPublicInfoForm
       .map((tier) => `${tier.amount} 元：${tier.description}`)
       .join('\n'),
     latestUpdates: normalizeStringArray(application.latest_updates).join('\n'),
+    progressUpdateTitle: '',
+    progressUpdateDetails: '',
   };
+}
+
+function formatProgressUpdateTime(value: string) {
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) {
+    return '时间未记录';
+  }
+
+  return timestamp.toLocaleString('zh-CN');
+}
+
+function ProgressUpdateList({ items }: { items: ProjectProgressUpdateRecord[] }) {
+  if (items.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-purple-200/70 bg-purple-50/40 p-4 text-sm text-slate-500 dark:border-purple-900/40 dark:bg-purple-950/10 dark:text-slate-400">
+        还没有项目进度记录。发起人每次补充进展后，这里会自动沉淀成时间线。
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((item, index) => (
+        <div
+          key={`${item.recordedAt}-${index}`}
+          className="rounded-2xl border border-purple-100/70 bg-white/80 p-4 dark:border-purple-900/40 dark:bg-slate-900/70"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="font-medium text-slate-900 dark:text-slate-100">{item.title}</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">{formatProgressUpdateTime(item.recordedAt)}</div>
+          </div>
+          <div className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-400">{item.details}</div>
+          <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500 dark:text-slate-400">
+            <span>进度：{item.completionRate}%</span>
+            <span>支持人数：{item.supporterCount}</span>
+            <span>剩余时间：{item.daysLeft} 天</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function ProfilePage() {
@@ -454,6 +502,14 @@ export default function ProfilePage() {
                                 推荐标签：{application.badge_label || '平台审核通过'}
                               </div>
                             </div>
+
+                            <div className="mt-4 rounded-2xl bg-white/80 p-4 dark:bg-slate-900/80">
+                              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
+                                <Activity className="h-4 w-4 text-purple-500" />
+                                项目进度记录
+                              </div>
+                              <ProgressUpdateList items={normalizeProgressUpdates(application.progress_updates)} />
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -578,6 +634,49 @@ export default function ProfilePage() {
                   placeholder={'请按每行一条填写，例如：\n已完成第一版原型\n正在招募首批测试用户'}
                   value={editForm.latestUpdates}
                   onChange={(event) => setEditForm((current) => (current ? { ...current, latestUpdates: event.target.value } : current))}
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
+                <div>
+                  <Label htmlFor="progressUpdateTitle">本次进度标题</Label>
+                  <Input
+                    id="progressUpdateTitle"
+                    placeholder="例如：完成第一轮测试"
+                    value={editForm.progressUpdateTitle}
+                    onChange={(event) =>
+                      setEditForm((current) =>
+                        current ? { ...current, progressUpdateTitle: event.target.value } : current
+                      )
+                    }
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="progressUpdateDetails">本次进度详情</Label>
+                  <Textarea
+                    id="progressUpdateDetails"
+                    rows={4}
+                    placeholder={'例如：\n已完成 12 位用户访谈，整理出 3 个高频需求点。\n下周会开始第二版原型验证。'}
+                    value={editForm.progressUpdateDetails}
+                    onChange={(event) =>
+                      setEditForm((current) =>
+                        current ? { ...current, progressUpdateDetails: event.target.value } : current
+                      )
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-purple-100/70 bg-purple-50/40 p-4 dark:border-purple-900/40 dark:bg-purple-950/10">
+                <div className="mb-3 text-sm font-medium text-slate-900 dark:text-slate-100">已记录的项目进度</div>
+                <ProgressUpdateList
+                  items={
+                    applications.find((application) => application.id === editForm.submissionId)
+                      ? normalizeProgressUpdates(
+                          applications.find((application) => application.id === editForm.submissionId)?.progress_updates
+                        )
+                      : []
+                  }
                 />
               </div>
 

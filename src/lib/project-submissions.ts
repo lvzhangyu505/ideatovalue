@@ -1,4 +1,8 @@
-import type { DiscoveryProject, DiscoverySupportTier } from '@/lib/project-discovery';
+import type {
+  DiscoveryProgressUpdate,
+  DiscoveryProject,
+  DiscoverySupportTier,
+} from '@/lib/project-discovery';
 import { getRecommendedSlugFromBadgeLabel } from '@/lib/project-applications';
 
 export const SUBMISSION_STATUS_VALUES = ['pending', 'approved', 'rejected'] as const;
@@ -32,6 +36,7 @@ export type ProjectSubmissionRecord = {
   days_left: number;
   support_tiers: unknown;
   latest_updates: unknown;
+  progress_updates: unknown;
   contact_name: string;
   contact_email: string;
   contact_phone: string | null;
@@ -39,6 +44,15 @@ export type ProjectSubmissionRecord = {
   reviewer_email: string | null;
   review_note: string | null;
   reviewed_at: string | null;
+};
+
+export type ProjectProgressUpdateRecord = {
+  title: string;
+  details: string;
+  recordedAt: string;
+  completionRate: number;
+  supporterCount: number;
+  daysLeft: number;
 };
 
 const categoryEmojiMap: Record<string, string> = {
@@ -78,6 +92,19 @@ function isSupportTier(value: unknown): value is DiscoverySupportTier {
   );
 }
 
+function isProgressUpdateRecord(value: unknown): value is ProjectProgressUpdateRecord {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      typeof (value as { title?: unknown }).title === 'string' &&
+      typeof (value as { details?: unknown }).details === 'string' &&
+      typeof (value as { recordedAt?: unknown }).recordedAt === 'string' &&
+      typeof (value as { completionRate?: unknown }).completionRate === 'number' &&
+      typeof (value as { supporterCount?: unknown }).supporterCount === 'number' &&
+      typeof (value as { daysLeft?: unknown }).daysLeft === 'number'
+  );
+}
+
 export function normalizeSupportTiers(value: unknown) {
   if (!Array.isArray(value)) {
     return [] as DiscoverySupportTier[];
@@ -94,6 +121,14 @@ export function normalizeStringArray(value: unknown) {
   return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
 }
 
+export function normalizeProgressUpdates(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [] as ProjectProgressUpdateRecord[];
+  }
+
+  return value.filter(isProgressUpdateRecord);
+}
+
 export function toPublicProjectId(submissionId: string) {
   return `submission-${submissionId}`;
 }
@@ -106,6 +141,7 @@ export function mapSubmissionToDiscoveryProject(submission: ProjectSubmissionRec
   const normalizedBadgeLabel = submission.badge_label?.trim() || '平台审核通过';
   const normalizedUpdates = normalizeStringArray(submission.latest_updates);
   const normalizedTiers = normalizeSupportTiers(submission.support_tiers);
+  const normalizedProgressUpdates = normalizeProgressUpdates(submission.progress_updates);
   const recommendedSlug = getRecommendedSlugFromBadgeLabel(normalizedBadgeLabel);
 
   return {
@@ -141,5 +177,15 @@ export function mapSubmissionToDiscoveryProject(submission: ProjectSubmissionRec
     neededResources: submission.needed_resources,
     riskResponses: submission.risk_responses,
     timeline: submission.timeline,
+    progressUpdates: normalizedProgressUpdates.map(
+      (item): DiscoveryProgressUpdate => ({
+        title: item.title,
+        details: item.details,
+        recordedAt: item.recordedAt,
+        completionRate: item.completionRate,
+        supporterCount: item.supporterCount,
+        daysLeft: item.daysLeft,
+      })
+    ),
   };
 }

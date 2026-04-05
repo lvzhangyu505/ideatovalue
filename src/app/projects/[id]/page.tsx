@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
+  Activity,
   AlertTriangle,
   ArrowLeft,
   BookOpen,
@@ -320,6 +321,38 @@ export default async function ProjectDetailPage({
                     </CardHeader>
                     <CardContent className="text-sm leading-8 text-slate-600 dark:text-slate-400">
                       {project.timeline}
+                    </CardContent>
+                  </Card>
+                ) : null}
+
+                {project.progressUpdates && project.progressUpdates.length > 0 ? (
+                  <Card className="rounded-[28px] border border-purple-100/60 bg-white/75 shadow-xl shadow-purple-500/6 backdrop-blur-xl dark:border-purple-900/30 dark:bg-slate-900/70">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-purple-500" />
+                        项目进度记录
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {project.progressUpdates.map((item, index) => (
+                        <div
+                          key={`${item.recordedAt}-${index}`}
+                          className="rounded-2xl border border-purple-100/70 bg-slate-50/80 p-5 dark:border-purple-900/40 dark:bg-slate-950/60"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-base font-semibold text-slate-900 dark:text-slate-100">{item.title}</div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                              {new Date(item.recordedAt).toLocaleString('zh-CN')}
+                            </div>
+                          </div>
+                          <div className="mt-3 text-sm leading-8 text-slate-600 dark:text-slate-400">{item.details}</div>
+                          <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
+                            <span>当时进度：{item.completionRate}%</span>
+                            <span>当时支持人数：{item.supporterCount}</span>
+                            <span>当时剩余时间：{item.daysLeft} 天</span>
+                          </div>
+                        </div>
+                      ))}
                     </CardContent>
                   </Card>
                 ) : null}

@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
+import { sendProjectProgressUpdateAdminMail } from '@/lib/project-notification-email';
 import { createSupabaseServiceClient, getUserFromAccessToken, isSupabaseServerConfigured } from '@/lib/supabase/server';
 import { PROJECT_PUBLIC_STAGE_OPTIONS } from '@/lib/project-applications';
+import { normalizeProgressUpdates } from '@/lib/project-submissions';
 
 export const runtime = 'nodejs';
 
@@ -30,6 +32,8 @@ const updateSubmissionSchema = z.object({
   daysLeft: z.coerce.number().int().min(0).default(30),
   supportTiers: z.string().trim().optional().default(''),
   latestUpdates: z.string().trim().optional().default(''),
+  progressUpdateTitle: z.string().trim().max(80).optional().default(''),
+  progressUpdateDetails: z.string().trim().max(2000).optional().default(''),
 });
 
 function splitMultilineLines(value: string) {
@@ -54,6 +58,19 @@ function parseSupportTiers(value: string) {
       };
     })
     .filter((item): item is { amount: number; description: string } => Boolean(item));
+}
+
+function getFounderName(user: Awaited<ReturnType<typeof getUserFromAccessToken>>) {
+  const metadataName =
+    user?.user_metadata && typeof user.user_metadata === 'object'
+      ? (user.user_metadata as { display_name?: unknown }).display_name
+      : undefined;
+
+  if (typeof metadataName === 'string' && metadataName.trim()) {
+    return metadataName.trim();
+  }
+
+  return user?.email || '项目发起人';
 }
 
 export async function GET(request: Request) {
@@ -110,6 +127,8 @@ export async function PATCH(request: Request) {
     const data = updateSubmissionSchema.parse(body);
     const supportTiers = parseSupportTiers(data.supportTiers);
     const latestUpdates = splitMultilineLines(data.latestUpdates);
+    const hasProgressUpdateTitle = Boolean(data.progressUpdateTitle.trim());
+    const hasProgressUpdateDetails = Boolean(data.progressUpdateDetails.trim());
 
     if (data.supportTiers.trim() && supportTiers.length === 0) {
       return NextResponse.json(
@@ -118,10 +137,14 @@ export async function PATCH(request: Request) {
       );
     }
 
+    if (hasProgressUpdateTitle && !hasProgressUpdateDetails) {
+      return NextResponse.json({ message: '请补充本次项目进度详情后再保存。' }, { status: 400 });
+    }
+
     const supabase = createSupabaseServiceClient();
     const { data: existing, error: existingError } = await supabase
       .from('project_submissions')
-      .select('id, user_id')
+      .select('id, user_id, project_name, project_type, project_subcategory, status, progress_updates')
       .eq('id', data.submissionId)
       .maybeSingle();
 
@@ -131,6 +154,18 @@ export async function PATCH(request: Request) {
 
     if (existing.user_id !== user.id) {
       return NextResponse.json({ message: '你没有权限编辑这条项目记录。' }, { status: 403 });
+    }
+
+    const nextProgressUpdates = normalizeProgressUpdates(existing.progress_updates);
+    if (hasProgressUpdateDetails) {
+      nextProgressUpdates.unshift({
+        title: data.progressUpdateTitle.trim() || '项目进度更新',
+        details: data.progressUpdateDetails.trim(),
+        recordedAt: new Date().toISOString(),
+        completionRate: data.completionRate,
+        supporterCount: data.supporterCount,
+        daysLeft: data.daysLeft,
+      });
     }
 
     const { error } = await supabase
@@ -143,6 +178,7 @@ export async function PATCH(request: Request) {
         days_left: data.daysLeft,
         support_tiers: supportTiers,
         latest_updates: latestUpdates,
+        progress_updates: nextProgressUpdates,
       })
       .eq('id', data.submissionId);
 
@@ -153,7 +189,38 @@ export async function PATCH(request: Request) {
       );
     }
 
-    return NextResponse.json({ success: true, message: '公开信息已更新。' });
+    let adminMailMessage = '';
+    if (hasProgressUpdateDetails) {
+      try {
+        const stageLabel =
+          PROJECT_PUBLIC_STAGE_OPTIONS.find((option) => option.slug === data.publicStage)?.label || data.publicStage;
+        const mailResult = await sendProjectProgressUpdateAdminMail({
+          projectName: existing.project_name,
+          projectType: existing.project_type,
+          projectSubcategory: existing.project_subcategory,
+          projectStatus: existing.status,
+          founderName: getFounderName(user),
+          founderEmail: user.email,
+          publicStageLabel: stageLabel,
+          completionRate: data.completionRate,
+          supporterCount: data.supporterCount,
+          daysLeft: data.daysLeft,
+          updateTitle: data.progressUpdateTitle.trim() || '项目进度更新',
+          updateDetails: data.progressUpdateDetails.trim(),
+        });
+        adminMailMessage = mailResult.sent ? ' 管理员通知邮件已发送。' : ` ${mailResult.message}`;
+      } catch (mailError) {
+        console.error('项目进度更新通知管理员失败:', mailError);
+        adminMailMessage = ' 已记录进度更新，但管理员通知邮件发送失败。';
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: hasProgressUpdateDetails
+        ? `公开信息和项目进度记录已更新。${adminMailMessage}`.trim()
+        : '公开信息已更新。',
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ message: '补充信息格式不正确，请检查后重试。' }, { status: 400 });

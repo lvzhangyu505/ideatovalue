@@ -28,6 +28,7 @@ create table if not exists public.project_submissions (
   days_left integer not null default 30,
   support_tiers jsonb not null default '[]'::jsonb,
   latest_updates jsonb not null default '[]'::jsonb,
+  progress_updates jsonb not null default '[]'::jsonb,
   contact_name text not null,
   contact_email text not null,
   contact_phone text,
@@ -58,6 +59,9 @@ alter table public.project_submissions
 alter table public.project_submissions
   add column if not exists latest_updates jsonb not null default '[]'::jsonb;
 
+alter table public.project_submissions
+  add column if not exists progress_updates jsonb not null default '[]'::jsonb;
+
 update public.project_submissions
 set
   public_stage = coalesce(nullif(public_stage, ''), 'supporting'),
@@ -66,7 +70,8 @@ set
   supporter_count = coalesce(supporter_count, 0),
   days_left = coalesce(days_left, 30),
   support_tiers = coalesce(support_tiers, '[]'::jsonb),
-  latest_updates = coalesce(latest_updates, '[]'::jsonb);
+  latest_updates = coalesce(latest_updates, '[]'::jsonb),
+  progress_updates = coalesce(progress_updates, '[]'::jsonb);
 
 create index if not exists project_submissions_user_id_idx on public.project_submissions(user_id);
 create index if not exists project_submissions_status_idx on public.project_submissions(status);

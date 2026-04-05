@@ -26,6 +26,15 @@ export type DiscoverySupportTier = {
   description: string;
 };
 
+export type DiscoveryProgressUpdate = {
+  title: string;
+  details: string;
+  recordedAt: string;
+  completionRate: number;
+  supporterCount: number;
+  daysLeft: number;
+};
+
 export type DiscoveryProject = {
   id: number | string;
   title: string;
@@ -54,6 +63,7 @@ export type DiscoveryProject = {
   neededResources?: string;
   riskResponses?: string;
   timeline?: string;
+  progressUpdates?: DiscoveryProgressUpdate[];
 };
 
 export const discoveryCategories: DiscoveryPrimaryCategory[] = [
