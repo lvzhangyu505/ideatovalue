@@ -36,6 +36,10 @@ const updateSubmissionSchema = z.object({
   progressUpdateDetails: z.string().trim().max(2000).optional().default(''),
 });
 
+const deleteSubmissionSchema = z.object({
+  submissionId: z.string().uuid(),
+});
+
 function splitMultilineLines(value: string) {
   return value
     .split('\n')
@@ -228,5 +232,59 @@ export async function PATCH(request: Request) {
 
     console.error('更新项目公开信息失败:', error);
     return NextResponse.json({ message: '更新项目公开信息失败，请稍后重试。' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  if (!isSupabaseServerConfigured()) {
+    return NextResponse.json({ message: 'Supabase 服务端环境变量未配置。' }, { status: 500 });
+  }
+
+  try {
+    const accessToken = getAuthorizationToken(request);
+    if (!accessToken) {
+      return NextResponse.json({ message: '请先登录。' }, { status: 401 });
+    }
+
+    const user = await getUserFromAccessToken(accessToken);
+    if (!user?.email) {
+      return NextResponse.json({ message: '当前登录状态无效，请重新登录。' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const data = deleteSubmissionSchema.parse(body);
+
+    const supabase = createSupabaseServiceClient();
+    const { data: existing, error: existingError } = await supabase
+      .from('project_submissions')
+      .select('id, user_id, project_name')
+      .eq('id', data.submissionId)
+      .maybeSingle();
+
+    if (existingError || !existing) {
+      return NextResponse.json({ message: '没有找到对应的项目记录。' }, { status: 404 });
+    }
+
+    if (existing.user_id !== user.id) {
+      return NextResponse.json({ message: '你没有权限删除这条项目记录。' }, { status: 403 });
+    }
+
+    const { error } = await supabase.from('project_submissions').delete().eq('id', data.submissionId);
+
+    if (error) {
+      return NextResponse.json({ message: `删除项目失败：${error.message}` }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `项目“${existing.project_name}”已删除。`,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ message: '删除参数不正确。' }, { status: 400 });
+    }
+
+    console.error('删除项目失败:', error);
+    return NextResponse.json({ message: '删除项目失败，请稍后重试。' }, { status: 500 });
   }
 }

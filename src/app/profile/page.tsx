@@ -13,9 +13,20 @@ import {
   PencilLine,
   Rocket,
   ShieldCheck,
+  Trash2,
   UserRound,
 } from 'lucide-react';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { AuthActions } from '@/components/auth-actions';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -154,10 +165,14 @@ export default function ProfilePage() {
   const { user, isLoading } = useAuthUser();
   const [applications, setApplications] = useState<ProjectSubmissionRecord[]>([]);
   const [editingSubmissionId, setEditingSubmissionId] = useState('');
+  const [deleteSubmission, setDeleteSubmission] = useState<ProjectSubmissionRecord | null>(null);
   const [editForm, setEditForm] = useState<ProjectPublicInfoForm | null>(null);
   const [editError, setEditError] = useState('');
   const [editSuccess, setEditSuccess] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteSuccess, setDeleteSuccess] = useState('');
+  const [isDeletingSubmission, setIsDeletingSubmission] = useState(false);
 
   async function loadApplications() {
     if (!user) {
@@ -249,6 +264,56 @@ export default function ProfilePage() {
       setEditError('更新项目公开信息失败，请稍后重试。');
     } finally {
       setIsSavingEdit(false);
+    }
+  }
+
+  async function handleDeleteSubmission() {
+    if (!deleteSubmission) {
+      return;
+    }
+
+    setDeleteError('');
+    setDeleteSuccess('');
+
+    const supabase = getSupabaseBrowserClient();
+    const {
+      data: { session },
+    } = (await supabase?.auth.getSession()) ?? { data: { session: null } };
+
+    if (!session?.access_token) {
+      setDeleteError('当前登录状态已失效，请重新登录。');
+      return;
+    }
+
+    setIsDeletingSubmission(true);
+
+    try {
+      const response = await fetch('/api/my-project-submissions', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          submissionId: deleteSubmission.id,
+        }),
+      });
+
+      const result = (await response.json()) as { message?: string };
+
+      if (!response.ok) {
+        setDeleteError(result.message || '删除项目失败。');
+        return;
+      }
+
+      setDeleteSuccess(result.message || '项目已删除。');
+      setDeleteSubmission(null);
+      await loadApplications();
+    } catch (error) {
+      console.error('删除项目失败:', error);
+      setDeleteError('删除项目失败，请稍后重试。');
+    } finally {
+      setIsDeletingSubmission(false);
     }
   }
 
@@ -427,6 +492,18 @@ export default function ProfilePage() {
                     </Link>
                   </CardHeader>
                   <CardContent>
+                    {deleteError ? (
+                      <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+                        {deleteError}
+                      </div>
+                    ) : null}
+
+                    {deleteSuccess ? (
+                      <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-200">
+                        {deleteSuccess}
+                      </div>
+                    ) : null}
+
                     {applications.length === 0 ? (
                       <div className="rounded-2xl border border-dashed border-purple-200/70 bg-purple-50/50 p-8 text-center dark:border-purple-900/40 dark:bg-purple-950/10">
                         <FolderKanban className="mx-auto mb-4 h-10 w-10 text-purple-500" />
@@ -496,6 +573,18 @@ export default function ProfilePage() {
                                   </Button>
                                 </Link>
                               ) : null}
+                              <Button
+                                variant="ghost"
+                                className="text-red-600 hover:text-red-700 dark:text-red-300 dark:hover:text-red-200"
+                                onClick={() => {
+                                  setDeleteError('');
+                                  setDeleteSuccess('');
+                                  setDeleteSubmission(application);
+                                }}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                删除项目
+                              </Button>
                               <div className="text-sm text-slate-500 dark:text-slate-400">
                                 展示阶段：{getDiscoveryStageLabel(application.public_stage)}
                                 {' · '}
@@ -713,6 +802,40 @@ export default function ProfilePage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={Boolean(deleteSubmission)}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingSubmission) {
+            setDeleteSubmission(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除这个项目吗？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteSubmission
+                ? `删除后，“${deleteSubmission.project_name}”会从你的个人中心、管理员审核列表和公开项目详情中移除。这个操作不能撤销。`
+                : '删除后项目会从平台记录中移除。'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingSubmission}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDeleteSubmission();
+              }}
+              disabled={isDeletingSubmission}
+              className="bg-red-600 text-white hover:bg-red-700 focus:ring-red-500"
+            >
+              {isDeletingSubmission ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              确认删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
